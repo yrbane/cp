@@ -56,9 +56,21 @@ pub fn preserve_metadata(
         preserve_timestamps(dst, src_meta, is_symlink)?;
     }
 
-    // 5. ACL
+    // 5. ACL (includes POSIX permission bits — may override mode)
     if opts.preserve_acl && ACL_SUPPORTED.load(Ordering::Relaxed) {
+        // ACL entries include the POSIX permission bits (owner/group/other).
+        // If mode is NOT being preserved, save the current mode and restore after ACL.
+        let saved_mode = if !opts.preserve_mode && !is_symlink {
+            fs::metadata(dst).ok().map(|m| m.mode() & 0o7777)
+        } else {
+            None
+        };
+
         preserve_acl(src, dst)?;
+
+        if let Some(mode) = saved_mode {
+            fs::set_permissions(dst, fs::Permissions::from_mode(mode)).ok();
+        }
     }
 
     Ok(())

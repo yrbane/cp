@@ -508,6 +508,339 @@ fn bench_single_file_startup() {
     eprintln!("  startup overhead: ~{:.1}ms", avg.as_secs_f64() * 1000.0);
 }
 
+// ─── Benchmark: 1GB file ─────────────────────────────────────────────────────
+
+#[test]
+fn bench_1gb_file() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("1gb_src");
+    create_file(&src, 1024 * 1024 * 1024);
+
+    eprintln!("\n=== 1 GB file copy ===");
+
+    let gnu_dst = tmp.path().join("gnu_1gb");
+    let gnu_time = bench_single("GNU cp", || {
+        let _ = fs::remove_file(&gnu_dst);
+        Command::new("/usr/bin/cp")
+            .arg(&src)
+            .arg(&gnu_dst)
+            .output()
+            .unwrap();
+    });
+
+    let our_dst = tmp.path().join("our_1gb");
+    let our_time = bench_single("our cp", || {
+        let _ = fs::remove_file(&our_dst);
+        Command::new(our_cp())
+            .arg("--sparse=never")
+            .arg(&src)
+            .arg(&our_dst)
+            .output()
+            .unwrap();
+    });
+
+    // Verify correctness (just size to avoid 1GB memcmp)
+    assert_eq!(
+        fs::metadata(&our_dst).unwrap().len(),
+        1024 * 1024 * 1024,
+    );
+
+    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+}
+
+// ─── Benchmark: 10K tiny files ───────────────────────────────────────────────
+
+#[test]
+fn bench_ten_thousand_tiny() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("tiny_src");
+    create_many_files(&src, 10_000, 100); // 10K × 100B
+
+    eprintln!("\n=== 10,000 tiny files (100B each) ===");
+
+    let gnu_dst = tmp.path().join("gnu_tiny");
+    let gnu_time = bench_single("GNU cp -R", || {
+        let _ = fs::remove_dir_all(&gnu_dst);
+        Command::new("/usr/bin/cp")
+            .arg("-R")
+            .arg(&src)
+            .arg(&gnu_dst)
+            .output()
+            .unwrap();
+    });
+
+    let our_dst = tmp.path().join("our_tiny");
+    let our_time = bench_single("our cp -R", || {
+        let _ = fs::remove_dir_all(&our_dst);
+        Command::new(our_cp())
+            .arg("-R")
+            .arg(&src)
+            .arg(&our_dst)
+            .output()
+            .unwrap();
+    });
+
+    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+}
+
+// ─── Benchmark: Metadata overhead ────────────────────────────────────────────
+
+#[test]
+fn bench_metadata_overhead() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("meta_src");
+    create_many_files(&src, 500, 4096); // 500 × 4KB
+
+    eprintln!("\n=== Metadata overhead: no flags vs -p vs -a (500 × 4KB) ===");
+
+    let dst_plain = tmp.path().join("dst_plain");
+    bench_single("our cp -R (no flags)", || {
+        let _ = fs::remove_dir_all(&dst_plain);
+        Command::new(our_cp())
+            .arg("-R")
+            .arg(&src)
+            .arg(&dst_plain)
+            .output()
+            .unwrap();
+    });
+
+    let dst_p = tmp.path().join("dst_p");
+    bench_single("our cp -Rp", || {
+        let _ = fs::remove_dir_all(&dst_p);
+        Command::new(our_cp())
+            .arg("-Rp")
+            .arg(&src)
+            .arg(&dst_p)
+            .output()
+            .unwrap();
+    });
+
+    let dst_a = tmp.path().join("dst_a");
+    bench_single("our cp -a", || {
+        let _ = fs::remove_dir_all(&dst_a);
+        Command::new(our_cp())
+            .arg("-a")
+            .arg(&src)
+            .arg(&dst_a)
+            .output()
+            .unwrap();
+    });
+}
+
+// ─── Benchmark: Sparse fragmented ────────────────────────────────────────────
+
+#[test]
+fn bench_sparse_fragmented() {
+    use std::io::{Seek, SeekFrom};
+
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("sparse_frag");
+    // 100MB: alternating 1MB data / 1MB hole × 50
+    {
+        let mut f = fs::File::create(&src).unwrap();
+        let data_chunk = vec![0xABu8; 1024 * 1024];
+        for i in 0..50 {
+            f.seek(SeekFrom::Start(i * 2 * 1024 * 1024)).unwrap();
+            f.write_all(&data_chunk).unwrap();
+        }
+        f.set_len(100 * 1024 * 1024).unwrap();
+    }
+
+    eprintln!("\n=== Sparse fragmented (100MB, 50 × 1MB data/hole) ===");
+
+    let gnu_dst = tmp.path().join("gnu_sfrag");
+    let gnu_time = bench_single("GNU cp --sparse=auto", || {
+        let _ = fs::remove_file(&gnu_dst);
+        Command::new("/usr/bin/cp")
+            .arg("--sparse=auto")
+            .arg(&src)
+            .arg(&gnu_dst)
+            .output()
+            .unwrap();
+    });
+
+    let our_dst = tmp.path().join("our_sfrag");
+    let our_time = bench_single("our cp --sparse=auto", || {
+        let _ = fs::remove_file(&our_dst);
+        Command::new(our_cp())
+            .arg("--sparse=auto")
+            .arg(&src)
+            .arg(&our_dst)
+            .output()
+            .unwrap();
+    });
+
+    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+}
+
+// ─── Benchmark: Attributes only ──────────────────────────────────────────────
+
+#[test]
+fn bench_attributes_only() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("attr_src");
+    create_many_files(&src, 1000, 4096); // 1000 × 4KB
+
+    // Pre-create destination for --attributes-only
+    let dst_attr = tmp.path().join("dst_attr");
+    Command::new(our_cp())
+        .arg("-R")
+        .arg(&src)
+        .arg(&dst_attr)
+        .output()
+        .unwrap();
+
+    eprintln!("\n=== Attributes-only vs full copy (1000 × 4KB) ===");
+
+    let dst_full = tmp.path().join("dst_full");
+    bench_single("our cp -R (full copy)", || {
+        let _ = fs::remove_dir_all(&dst_full);
+        Command::new(our_cp())
+            .arg("-R")
+            .arg(&src)
+            .arg(&dst_full)
+            .output()
+            .unwrap();
+    });
+
+    bench_single("our cp --attributes-only -p", || {
+        Command::new(our_cp())
+            .arg("-R")
+            .arg("--attributes-only")
+            .arg("-p")
+            .arg(&src)
+            .arg(&dst_attr)
+            .output()
+            .unwrap();
+    });
+}
+
+// ─── Benchmark: Update mode overhead ─────────────────────────────────────────
+
+#[test]
+fn bench_update_mode() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("upd_src");
+    create_many_files(&src, 1000, 4096); // 1000 × 4KB
+
+    // Create dst with some files newer, some older
+    let dst = tmp.path().join("upd_dst");
+    Command::new(our_cp())
+        .arg("-R")
+        .arg(&src)
+        .arg(&dst)
+        .output()
+        .unwrap();
+
+    // Touch half the source files to make them newer
+    for i in 0..500 {
+        let p = src.join(format!("file_{:06}", i));
+        filetime::set_file_mtime(
+            &p,
+            filetime::FileTime::from_unix_time(2_000_000_000, 0),
+        )
+        .unwrap();
+    }
+
+    eprintln!("\n=== Update mode: -u vs plain (1000 files, 50% newer) ===");
+
+    bench_single("our cp -R (no -u)", || {
+        Command::new(our_cp())
+            .arg("-R")
+            .arg(&src)
+            .arg(&dst)
+            .output()
+            .unwrap();
+    });
+
+    bench_single("our cp -Ru", || {
+        Command::new(our_cp())
+            .arg("-Ru")
+            .arg(&src)
+            .arg(&dst)
+            .output()
+            .unwrap();
+    });
+}
+
+// ─── Benchmark: Fine parallel threshold ──────────────────────────────────────
+
+#[test]
+fn bench_fine_threshold() {
+    eprintln!("\n=== Fine parallel threshold sweep (48/56/63/65/80 files) ===");
+
+    for &count in &[48, 56, 63, 65, 80] {
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("src");
+        create_many_files(&src, count, 4096);
+
+        let our_dst = tmp.path().join("our_dst");
+        bench_single(&format!("our cp -R ({} files)", count), || {
+            let _ = fs::remove_dir_all(&our_dst);
+            Command::new(our_cp())
+                .arg("-R")
+                .arg(&src)
+                .arg(&our_dst)
+                .output()
+                .unwrap();
+        });
+    }
+}
+
+// ─── Benchmark: Backup overhead ──────────────────────────────────────────────
+
+#[test]
+fn bench_backup_overhead() {
+    let tmp = TempDir::new().unwrap();
+    let src = tmp.path().join("bak_src");
+    create_many_files(&src, 1000, 4096); // 1000 × 4KB
+
+    eprintln!("\n=== Backup overhead: --backup=simple vs plain (1000 × 4KB) ===");
+
+    // Pre-create destination
+    let dst_plain = tmp.path().join("bak_dst_plain");
+    Command::new(our_cp())
+        .arg("-R")
+        .arg(&src)
+        .arg(&dst_plain)
+        .output()
+        .unwrap();
+
+    let dst_bak = tmp.path().join("bak_dst_bak");
+    Command::new(our_cp())
+        .arg("-R")
+        .arg(&src)
+        .arg(&dst_bak)
+        .output()
+        .unwrap();
+
+    bench_single("our cp -R (no backup)", || {
+        Command::new(our_cp())
+            .arg("-R")
+            .arg(&src)
+            .arg(&dst_plain)
+            .output()
+            .unwrap();
+    });
+
+    bench_single("our cp -R --backup=simple", || {
+        // Clean up backups from previous run
+        for entry in fs::read_dir(&dst_bak).unwrap() {
+            let e = entry.unwrap();
+            if e.file_name().to_string_lossy().ends_with('~') {
+                let _ = fs::remove_file(e.path());
+            }
+        }
+        Command::new(our_cp())
+            .arg("-R")
+            .arg("--backup=simple")
+            .arg(&src)
+            .arg(&dst_bak)
+            .output()
+            .unwrap();
+    });
+}
+
 fn main() {
     // This file uses #[test] functions as benchmarks
     // Run with: cargo test --release --test copy_bench -- --nocapture

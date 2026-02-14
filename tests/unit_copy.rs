@@ -180,3 +180,165 @@ fn copy_attributes_only() {
     assert_eq!(file_size(&e.p("dst")), 0);
     assert_eq!(mode(&e.p("dst")), 0o755);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn copy_update_none_skips() {
+    let e = Env::new();
+    e.file("src", "new content");
+    e.file("dst", "keep_me");
+
+    cp().arg("--update=none")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "keep_me");
+}
+
+#[test]
+fn copy_update_none_fail_skips() {
+    let e = Env::new();
+    e.file("src", "new content");
+    e.file("dst", "keep_me");
+
+    cp().arg("--update=none-fail")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "keep_me");
+}
+
+#[test]
+fn copy_update_all_always_copies() {
+    let e = Env::new();
+    e.file("src", "old_src");
+    e.set_mtime("src", 1_000_000);
+    e.file("dst", "newer_dst"); // dst has current (newer) mtime
+
+    cp().arg("--update=all")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "old_src");
+}
+
+#[test]
+fn copy_attributes_only_creates_empty() {
+    let e = Env::new();
+    e.file_mode("src", "has content", 0o741);
+
+    // dst does not exist → should create empty file
+    cp().arg("--attributes-only")
+        .arg("--preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert!(e.p("dst").exists());
+    assert_eq!(file_size(&e.p("dst")), 0);
+    assert_eq!(mode(&e.p("dst")), 0o741);
+}
+
+#[test]
+fn copy_attributes_only_preserves_existing() {
+    let e = Env::new();
+    e.file_mode("src", "src content", 0o741);
+    e.file("dst", "existing content");
+
+    cp().arg("--attributes-only")
+        .arg("--preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // Content should remain unchanged
+    assert_eq!(content(&e.p("dst")), "existing content");
+    // Mode should be updated
+    assert_eq!(mode(&e.p("dst")), 0o741);
+}
+
+#[test]
+fn copy_symlink_to_dir_without_r() {
+    let e = Env::new();
+    e.dir("target_dir");
+    e.symlink(&e.p("target_dir"), "link_to_dir");
+
+    // -L follows the symlink → sees a directory → "omitting directory"
+    cp().arg("-L")
+        .arg(e.p("link_to_dir"))
+        .arg(e.p("dst"))
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("omitting directory"));
+}
+
+#[test]
+fn copy_empty_file() {
+    let e = Env::new();
+    e.file("empty", "");
+
+    cp().arg(e.p("empty")).arg(e.p("dst")).assert().success();
+
+    assert!(e.p("dst").exists());
+    assert_eq!(file_size(&e.p("dst")), 0);
+    assert_eq!(content(&e.p("dst")), "");
+}
+
+#[test]
+fn copy_overwrite_existing_symlink() {
+    let e = Env::new();
+    e.file("src", "real data");
+    e.file("other", "other content");
+    e.symlink(&e.p("other"), "dst");
+
+    assert!(is_symlink(&e.p("dst")));
+
+    // --remove-destination first removes the symlink, then creates regular file
+    cp().arg("--remove-destination")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // dst should now be a regular file (not a symlink)
+    assert!(!is_symlink(&e.p("dst")));
+    assert_eq!(content(&e.p("dst")), "real data");
+    // original target should be unchanged
+    assert_eq!(content(&e.p("other")), "other content");
+}
+
+#[test]
+fn copy_sparse_threshold_boundary() {
+    use std::io::{Seek, SeekFrom, Write};
+
+    let e = Env::new();
+    // 32KB file (= SPARSE_THRESHOLD) with a hole
+    let p = e.p("sparse_src");
+    {
+        let mut f = std::fs::File::create(&p).unwrap();
+        f.write_all(&[0xAA; 4096]).unwrap();
+        f.seek(SeekFrom::Start(32 * 1024)).unwrap();
+        f.write_all(&[0xBB; 1]).unwrap(); // force total to be > 32KB
+        f.set_len(32 * 1024 + 1).unwrap();
+    }
+
+    // With --sparse=auto, file at threshold should trigger sparse detection
+    cp().arg("--sparse=auto")
+        .arg(e.p("sparse_src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(bytes(&e.p("sparse_src")), bytes(&e.p("dst")));
+}

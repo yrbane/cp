@@ -144,3 +144,26 @@ fn meta_acl_preserved() {
 
     assert!(posix_acl::PosixACL::read_acl(e.p("dst")).is_ok());
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn meta_preserve_all_except_mode() {
+    let e = Env::new();
+    e.file_mode("src", "content", 0o751);
+    e.set_mtime("src", 1_500_000_000);
+
+    cp().arg("--preserve=all")
+        .arg("--no-preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // Timestamps should be preserved
+    assert_eq!(mtime(&e.p("dst")), 1_500_000_000);
+    // Mode should NOT match source (was excluded by --no-preserve=mode)
+    assert_ne!(mode(&e.p("dst")), 0o751);
+}

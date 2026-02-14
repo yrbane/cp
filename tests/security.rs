@@ -362,3 +362,167 @@ fn sec_overwrite_dir_with_file() {
     }
     // Either way: no panic/crash
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Additional edge case security tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn sec_broken_symlink_with_l() {
+    let e = Env::new();
+    e.dir("src");
+    e.symlink("/nonexistent/broken_target", "src/broken");
+
+    // -R -L follows symlinks → broken symlink → error on stderr
+    let out = cp()
+        .arg("-R")
+        .arg("-L")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("No such file") || stderr.contains("cannot stat"),
+        "expected error about broken symlink, got: {stderr}"
+    );
+}
+
+#[test]
+fn sec_fifo_copy() {
+    use std::ffi::CString;
+
+    let e = Env::new();
+    let fifo_src = e.p("my_fifo");
+    let c_path = CString::new(fifo_src.to_str().unwrap()).unwrap();
+    let ret = unsafe { nix::libc::mkfifo(c_path.as_ptr(), 0o644) };
+    assert_eq!(ret, 0, "mkfifo failed");
+
+    // Single file FIFO copy (not recursive)
+    cp().arg(e.p("my_fifo")).arg(e.p("dst_fifo")).assert().success();
+
+    let ft = fs::symlink_metadata(e.p("dst_fifo")).unwrap().file_type();
+    assert!(
+        std::os::unix::fs::FileTypeExt::is_fifo(&ft),
+        "destination should be a FIFO"
+    );
+}
+
+#[test]
+fn sec_socket_copy_warning() {
+    use std::os::unix::net::UnixListener;
+
+    let e = Env::new();
+    let sock_path = e.p("my.sock");
+    let _listener = UnixListener::bind(&sock_path).unwrap();
+
+    // Copying a socket should produce a warning on stderr
+    let out = cp().arg(&sock_path).arg(e.p("dst_sock")).output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("warning") || stderr.contains("socket"),
+        "expected socket warning, got: {stderr}"
+    );
+}
+
+#[test]
+fn sec_same_file_two_symlinks() {
+    let e = Env::new();
+    e.file("real.txt", "data");
+    e.symlink(&e.p("real.txt"), "link_a");
+    e.symlink(&e.p("real.txt"), "link_b");
+
+    // Two different symlinks pointing to the same inode → "same file"
+    cp().arg(e.p("link_a"))
+        .arg(e.p("link_b"))
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("same file"));
+}
+
+#[test]
+fn sec_filename_255_chars() {
+    let e = Env::new();
+    let long_name = "x".repeat(255);
+    e.file(&long_name, "content");
+
+    cp().arg(e.p(&long_name))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "content");
+}
+
+#[test]
+fn sec_copy_into_self_via_symlink() {
+    let e = Env::new();
+    e.file("dir/file", "data");
+    e.symlink(&e.p("dir"), "link_to_dir");
+
+    // cp -R dir link_to_dir/sub → should detect copy-into-self
+    e.dir("dir/sub");
+    cp().arg("-R")
+        .arg(e.p("dir"))
+        .arg(e.p("dir/sub"))
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("into itself"));
+}
+
+#[test]
+fn sec_remove_destination_replaces_file() {
+    let e = Env::new();
+    e.file("src", "new content");
+    e.file_mode("dst", "old content", 0o444);
+
+    // --remove-destination should remove existing file first then copy
+    cp().arg("--remove-destination")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "new content");
+}
+
+#[test]
+fn sec_force_readonly_file() {
+    let e = Env::new();
+    e.file("src", "new data");
+    e.file_mode("dst", "protected", 0o000);
+
+    // -f should unlink the readonly file and create a new one
+    cp().arg("-f").arg(e.p("src")).arg(e.p("dst")).assert().success();
+
+    assert_eq!(content(&e.p("dst")), "new data");
+}
+
+#[test]
+fn sec_update_older_skips_newer() {
+    let e = Env::new();
+    e.file("src", "old_content");
+    e.set_mtime("src", 1_000_000);
+    e.file("dst", "newer_content"); // dst has current (newer) mtime
+
+    cp().arg("-u").arg(e.p("src")).arg(e.p("dst")).assert().success();
+
+    // dst should remain unchanged (newer)
+    assert_eq!(content(&e.p("dst")), "newer_content");
+}
+
+#[test]
+fn sec_no_clobber_exit_success() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "existing");
+
+    // -n with existing dest → exit 0 (silent skip)
+    cp().arg("-n")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "existing");
+}

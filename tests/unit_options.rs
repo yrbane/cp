@@ -181,3 +181,117 @@ fn opts_no_clobber_overrides_interactive() {
 
     assert_eq!(content(&e.p("dst")), "keep_me");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn opts_preserve_all_no_preserve_mode() {
+    let e = Env::new();
+    e.file_mode("src", "content", 0o751);
+    e.set_mtime("src", 1_500_000_000);
+
+    cp().arg("--preserve=all")
+        .arg("--no-preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // Timestamps should be preserved
+    assert_eq!(mtime(&e.p("dst")), 1_500_000_000);
+    // Mode should NOT be preserved (default umask-based)
+    assert_ne!(mode(&e.p("dst")), 0o751);
+}
+
+#[test]
+fn opts_preserve_unknown_attr_ignored() {
+    let e = Env::new();
+    e.file("src", "content");
+
+    // Unknown attributes like "foobar" should be silently ignored
+    cp().arg("--preserve=foobar")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "content");
+}
+
+#[test]
+fn opts_dereference_h_cli_only() {
+    let e = Env::new();
+    e.file("src/target", "data");
+    e.symlink("target", "src/deep_link");
+    e.symlink(&e.p("src"), "top_link");
+
+    // -R -H: follow symlink on command line (top_link), but NOT deep links
+    cp().arg("-R")
+        .arg("-H")
+        .arg(e.p("top_link"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // The top-level symlink was followed → dst should contain src contents
+    assert!(e.p("dst/target").exists());
+    assert_eq!(content(&e.p("dst/target")), "data");
+    // Deep symlink should be preserved (not followed)
+    assert!(is_symlink(&e.p("dst/deep_link")));
+}
+
+#[test]
+fn opts_sparse_default_auto() {
+    use std::io::{Seek, SeekFrom, Write};
+
+    let e = Env::new();
+    // Create a sparse file > SPARSE_THRESHOLD (32KB)
+    let p = e.p("sparse");
+    {
+        let mut f = std::fs::File::create(&p).unwrap();
+        f.write_all(&[0xAA; 4096]).unwrap();
+        f.seek(SeekFrom::Start(1024 * 1024)).unwrap();
+        f.write_all(&[0xBB; 4096]).unwrap();
+        f.set_len(1024 * 1024 + 4096).unwrap();
+    }
+
+    // Without --sparse flag, default is auto → should succeed with sparse handling
+    cp().arg(e.p("sparse"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(bytes(&e.p("sparse")), bytes(&e.p("dst")));
+}
+
+#[test]
+fn opts_reflink_default_never() {
+    let e = Env::new();
+    e.file("src", "data for reflink test");
+
+    // Without --reflink flag, default is never → should use copy_file_range
+    cp().arg("--debug")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("copy_file_range"));
+
+    assert_eq!(content(&e.p("dst")), "data for reflink test");
+}
+
+#[test]
+fn opts_debug_implies_verbose() {
+    let e = Env::new();
+    e.file("src", "content");
+
+    // --debug should imply verbose (outputs '->' message)
+    cp().arg("--debug")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("->"));
+}

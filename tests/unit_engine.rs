@@ -90,3 +90,35 @@ fn engine_overwrite_truncates() {
 
     assert_eq!(content(&e.p("dst")), "short");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn engine_exact_chunk_boundary() {
+    let e = Env::new();
+    // Exactly 64MB = COPY_FILE_RANGE_CHUNK
+    let size = 64 * 1024 * 1024;
+    let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    e.file("src", &data);
+
+    cp().arg("--sparse=never").arg(e.p("src")).arg(e.p("dst")).assert().success();
+
+    assert_eq!(file_size(&e.p("dst")), size as u64);
+    assert_eq!(bytes(&e.p("dst")), data);
+}
+
+#[test]
+fn engine_just_over_chunk() {
+    let e = Env::new();
+    // 64MB + 1 → requires 2 copy_file_range calls
+    let size = 64 * 1024 * 1024 + 1;
+    let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    e.file("src", &data);
+
+    cp().arg("--sparse=never").arg(e.p("src")).arg(e.p("dst")).assert().success();
+
+    assert_eq!(file_size(&e.p("dst")), size as u64);
+    assert_eq!(bytes(&e.p("dst")), data);
+}

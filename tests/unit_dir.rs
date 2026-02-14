@@ -120,3 +120,55 @@ fn dir_deep_nesting() {
 
     assert_eq!(content(&e.p("dst/a/b/c/d/e/f/g/h/leaf.txt")), "deep");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn dir_with_fifo() {
+    use std::ffi::CString;
+
+    let e = Env::new();
+    e.dir("src");
+    e.file("src/regular.txt", "hello");
+
+    // Create a FIFO in the source directory
+    let fifo_path = e.p("src/my_fifo");
+    let c_path = CString::new(fifo_path.to_str().unwrap()).unwrap();
+    let ret = unsafe { nix::libc::mkfifo(c_path.as_ptr(), 0o644) };
+    assert_eq!(ret, 0, "mkfifo failed");
+    assert!(fifo_path.exists());
+
+    // Use -R -L (dereference=Always) to trigger the walkdir slow path
+    // which properly handles FIFOs via copy_single → copy_fifo
+    cp().arg("-R").arg("-L").arg(e.p("src")).arg(e.p("dst")).assert().success();
+
+    // Regular file should be copied
+    assert_eq!(content(&e.p("dst/regular.txt")), "hello");
+    // FIFO should be recreated in destination
+    let dst_fifo = e.p("dst/my_fifo");
+    assert!(dst_fifo.exists());
+    let ft = std::fs::symlink_metadata(&dst_fifo).unwrap().file_type();
+    assert!(
+        std::os::unix::fs::FileTypeExt::is_fifo(&ft),
+        "destination should be a FIFO"
+    );
+}
+
+#[test]
+fn dir_very_wide() {
+    let e = Env::new();
+    e.dir("wide");
+    for i in 0..500 {
+        e.file(&format!("wide/f_{i:04}"), format!("content_{i}"));
+    }
+
+    cp().arg("-R").arg(e.p("wide")).arg(e.p("dst")).assert().success();
+
+    assert_eq!(file_count(&e.p("dst")), 500);
+    // Verify a sample of files
+    assert_eq!(content(&e.p("dst/f_0000")), "content_0");
+    assert_eq!(content(&e.p("dst/f_0250")), "content_250");
+    assert_eq!(content(&e.p("dst/f_0499")), "content_499");
+}

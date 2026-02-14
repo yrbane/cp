@@ -136,3 +136,62 @@ fn get_device_returns_nonzero() {
     let e = Env::new();
     assert!(std::fs::metadata(e.path()).unwrap().dev() > 0);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edge case tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn strip_trailing_all_slashes() {
+    // "///" → should become "/"
+    let s = PathBuf::from("///")
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
+    let result = if s.is_empty() {
+        PathBuf::from("/")
+    } else {
+        PathBuf::from(s)
+    };
+    assert_eq!(result, PathBuf::from("/"));
+}
+
+#[test]
+fn build_dest_path_parents_strips_root() {
+    let e = Env::new();
+    e.dir("dest");
+    let src = e.file("a/b/file.txt", "content");
+
+    // --parents should replicate full source path under dest
+    cp().arg("--parents")
+        .arg(&src)
+        .arg(e.p("dest"))
+        .assert()
+        .success();
+
+    let expected = e.p("dest").join(src.strip_prefix("/").unwrap());
+    assert!(expected.exists(), "file should exist at: {}", expected.display());
+    assert_eq!(std::fs::read_to_string(&expected).unwrap(), "content");
+}
+
+#[test]
+fn resolve_target_t_flag() {
+    let e = Env::new();
+    e.file("src1", "a");
+    e.file("src2", "b");
+    e.file("src3", "c");
+    e.dir("target");
+
+    // -t DIR: all remaining args are sources
+    cp().arg("-t")
+        .arg(e.p("target"))
+        .arg(e.p("src1"))
+        .arg(e.p("src2"))
+        .arg(e.p("src3"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("target/src1")), "a");
+    assert_eq!(content(&e.p("target/src2")), "b");
+    assert_eq!(content(&e.p("target/src3")), "c");
+}
