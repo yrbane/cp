@@ -433,9 +433,12 @@ fn copy_files_parallel(
     let hlmap = state.hard_link_map.take().map(Mutex::new);
     let state_ref: &RawCopyState = &*state;
     let first_err: Mutex<Option<CpError>> = Mutex::new(None);
+    // Deferred hard links: created after all files are copied to avoid races
+    let deferred_links: Mutex<Vec<(PathBuf, PathBuf)>> = Mutex::new(Vec::new());
 
     let hlmap_ref = hlmap.as_ref();
     let err_ref = &first_err;
+    let deferred_ref = &deferred_links;
 
     std::thread::scope(|scope| {
         for chunk in files.chunks(chunk_size) {
@@ -447,7 +450,7 @@ fn copy_files_parallel(
                     if let Err(e) = copy_file_openat_mt(
                         src_fd, dst_fd, name.as_c_str(),
                         src_path, dst_path,
-                        state_ref, hlmap_ref,
+                        state_ref, hlmap_ref, deferred_ref,
                     ) {
                         let mut g = err_ref.lock().unwrap();
                         if g.is_none() {
@@ -463,13 +466,27 @@ fn copy_files_parallel(
     // Restore hard_link_map
     state.hard_link_map = hlmap.map(|m| m.into_inner().unwrap());
 
-    match first_err.into_inner().unwrap() {
-        Some(e) => Err(e),
-        None => Ok(()),
+    if let Some(e) = first_err.into_inner().unwrap() {
+        return Err(e);
     }
+
+    // Phase 2: Create deferred hard links now that all originals exist
+    for (src, dst) in deferred_links.into_inner().unwrap() {
+        // Remove any placeholder file created by parallel copy
+        let _ = fs::remove_file(&dst);
+        fs::hard_link(&src, &dst).map_err(|e| CpError::HardLink {
+            src: src.clone(),
+            dst: dst.clone(),
+            source: e,
+        })?;
+    }
+
+    Ok(())
 }
 
 /// Thread-safe file copy via openat. Like `copy_file_openat` but uses Mutex for hard link map.
+/// Hard links are deferred: the first occurrence of an inode is copied normally and registered
+/// in the map; subsequent occurrences push to `deferred_links` for creation after all copies finish.
 fn copy_file_openat_mt(
     src_dir_fd: RawFd,
     dst_dir_fd: RawFd,
@@ -478,6 +495,7 @@ fn copy_file_openat_mt(
     dst_dir_path: &Path,
     state: &RawCopyState,
     hlmap: Option<&std::sync::Mutex<HashMap<(u64, u64), PathBuf>>>,
+    deferred_links: &std::sync::Mutex<Vec<(PathBuf, PathBuf)>>,
 ) -> CpResult<()> {
     let src_fd = unsafe {
         nix::libc::openat(
@@ -507,27 +525,23 @@ fn copy_file_openat_mt(
         None
     };
 
-    // Hard link detection with Mutex
+    // Hard link detection with Mutex — defer link creation to avoid race conditions
     if let Some(hlm) = hlmap {
         if let Some(ref s) = stat {
             if s.st_nlink > 1 {
                 let key = (s.st_dev, s.st_ino);
                 let name_os = bytes_to_os(name.to_bytes());
-                let dst_file = dst_dir_path.join(name_os);
+                let dst_file = dst_dir_path.join(&name_os);
                 let mut guard = hlm.lock().unwrap();
                 if let Some(first) = guard.get(&key) {
+                    // Another thread already claimed this inode — defer the hard link
                     let first = first.clone();
                     drop(guard);
-                    unsafe {
-                        nix::libc::close(src_fd);
-                        nix::libc::unlinkat(dst_dir_fd, name.as_ptr(), 0);
-                    }
-                    return fs::hard_link(&first, &dst_file).map_err(|e| CpError::HardLink {
-                        src: first,
-                        dst: dst_file,
-                        source: e,
-                    });
+                    unsafe { nix::libc::close(src_fd) };
+                    deferred_links.lock().unwrap().push((first, dst_file));
+                    return Ok(());
                 }
+                // First occurrence: register in map, then copy the file below
                 guard.insert(key, dst_file);
                 drop(guard);
             }
