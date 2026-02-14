@@ -3,10 +3,10 @@
 <br>
 
 <img src="https://img.shields.io/badge/lang-Rust-dea584?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
-<img src="https://img.shields.io/badge/lines-2,909-blue?style=for-the-badge" alt="Lines">
-<img src="https://img.shields.io/badge/tests-137_passing-brightgreen?style=for-the-badge" alt="Tests">
-<img src="https://img.shields.io/badge/benchmarks-11-blueviolet?style=for-the-badge" alt="Benchmarks">
-<img src="https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge" alt="License">
+<img src="https://img.shields.io/badge/lines-2,921-blue?style=for-the-badge" alt="Lines">
+<img src="https://img.shields.io/badge/tests-168_passing-brightgreen?style=for-the-badge" alt="Tests">
+<img src="https://img.shields.io/badge/benchmarks-19-blueviolet?style=for-the-badge" alt="Benchmarks">
+<img src="https://img.shields.io/badge/license-Unlicense-yellow?style=for-the-badge" alt="License">
 
 <br><br>
 
@@ -249,19 +249,19 @@ cp --debug file.dat /dst/
 ## Test Suite
 
 ```
-137 tests + 11 benchmarks — all passing
+168 tests + 19 benchmarks — all passing
 ```
 
 <br>
 
 | Suite | Tests | &nbsp; | Suite | Tests |
 |:---|---:|:---:|:---|---:|
-| `security` | **28** | | `unit_metadata` | **8** |
-| `unit_copy` | **15** | | `unit_parallel` | **8** |
-| `unit_util` | **15** | | `unit_backup` | **7** |
-| `integration` | **12** | | `unit_engine` | **7** |
-| `unit_options` | **12** | | `unit_sparse` | **4** |
-| `unit_dir` | **10** | | `benchmarks` | **11** |
+| `security` | **38** | | `unit_metadata` | **9** |
+| `unit_copy` | **24** | | `unit_sparse` | **9** |
+| `unit_options` | **18** | | `unit_parallel` | **8** |
+| `unit_util` | **18** | | `unit_engine` | **9** |
+| `integration` | **12** | | `unit_backup` | **11** |
+| `unit_dir` | **12** | | `benchmarks` | **19** |
 
 ```bash
 # Run all tests
@@ -296,7 +296,7 @@ src/
 
 tests/
 ├── common/mod.rs ····· Shared test harness (Env fixture)         194 lines
-└── 12 test files ····· 137 tests + 11 benchmarks               2439 lines
+└── 12 test files ····· 168 tests + 19 benchmarks               3560 lines
 
 html/
 └── index.html ········ Project showcase page                    1475 lines
@@ -308,8 +308,50 @@ html/
 
 <br>
 
+## Installation
+
+```bash
+# Build from source
+git clone https://github.com/yrbane/cp.git
+cd cp
+cargo build --release
+# Binary is at target/release/cp
+```
+
+<br>
+
+---
+
+<br>
+
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Run the tests (`cargo test --release`)
+4. Commit your changes
+5. Push and open a pull request
+
+<br>
+
+---
+
+<br>
+
+## License
+
+This project is released into the public domain under the [Unlicense](LICENSE). You are free to copy, modify, publish, use, compile, sell, or distribute this software for any purpose, commercial or non-commercial, and by any means.
+
+<br>
+
+---
+
+<br>
+
 <div align="center">
 
-Built with Rust &mdash; MIT License
+Built with Rust &mdash; [Unlicense](LICENSE)
 
 </div>

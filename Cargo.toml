@@ -2,6 +2,13 @@
 name = "cp"
 version = "0.1.0"
 edition = "2024"
+authors = ["yrbane"]
+description = "A modern GNU-compatible cp implementation in Rust — zero-copy I/O, parallel directory copy, sparse file detection"
+license = "Unlicense"
+repository = "https://github.com/yrbane/cp"
+keywords = ["cp", "copy", "filesystem", "cli", "unix"]
+categories = ["command-line-utilities", "filesystem"]
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
