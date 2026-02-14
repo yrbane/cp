@@ -760,7 +760,7 @@
 
     <div class="hero-stats animate-in delay-3">
       <div class="hero-stat">
-        <div class="num">2,909</div>
+        <div class="num">2,921</div>
         <div class="label">Lines of Rust</div>
       </div>
       <div class="hero-stat">
@@ -772,7 +772,7 @@
         <div class="label">CLI Flags</div>
       </div>
       <div class="hero-stat">
-        <div class="num">137</div>
+        <div class="num">168</div>
         <div class="label">Tests</div>
       </div>
     </div>
@@ -1245,28 +1245,28 @@
     <div class="section-tag">Quality</div>
     <h2 class="section-title">Test Suite</h2>
     <p class="section-desc">
-      137 tests across 12 suites &mdash; covering unit, integration, security,
+      168 tests across 12 suites &mdash; covering unit, integration, security,
       and performance benchmarks. All passing on every commit.
     </p>
 
     <div class="test-grid">
-      <div class="test-suite"><span class="ts-name">security</span><span class="ts-count">28</span></div>
-      <div class="test-suite"><span class="ts-name">unit_copy</span><span class="ts-count">15</span></div>
-      <div class="test-suite"><span class="ts-name">unit_util</span><span class="ts-count">15</span></div>
+      <div class="test-suite"><span class="ts-name">security</span><span class="ts-count">38</span></div>
+      <div class="test-suite"><span class="ts-name">unit_copy</span><span class="ts-count">24</span></div>
+      <div class="test-suite"><span class="ts-name">unit_options</span><span class="ts-count">18</span></div>
+      <div class="test-suite"><span class="ts-name">unit_util</span><span class="ts-count">18</span></div>
       <div class="test-suite"><span class="ts-name">integration</span><span class="ts-count">12</span></div>
-      <div class="test-suite"><span class="ts-name">unit_options</span><span class="ts-count">12</span></div>
-      <div class="test-suite"><span class="ts-name">unit_dir</span><span class="ts-count">10</span></div>
-      <div class="test-suite"><span class="ts-name">unit_metadata</span><span class="ts-count">8</span></div>
+      <div class="test-suite"><span class="ts-name">unit_dir</span><span class="ts-count">12</span></div>
+      <div class="test-suite"><span class="ts-name">unit_backup</span><span class="ts-count">11</span></div>
+      <div class="test-suite"><span class="ts-name">unit_metadata</span><span class="ts-count">9</span></div>
+      <div class="test-suite"><span class="ts-name">unit_engine</span><span class="ts-count">9</span></div>
+      <div class="test-suite"><span class="ts-name">unit_sparse</span><span class="ts-count">9</span></div>
       <div class="test-suite"><span class="ts-name">unit_parallel</span><span class="ts-count">8</span></div>
-      <div class="test-suite"><span class="ts-name">unit_backup</span><span class="ts-count">7</span></div>
-      <div class="test-suite"><span class="ts-name">unit_engine</span><span class="ts-count">7</span></div>
-      <div class="test-suite"><span class="ts-name">unit_sparse</span><span class="ts-count">4</span></div>
-      <div class="test-suite"><span class="ts-name">benchmarks</span><span class="ts-count">11</span></div>
+      <div class="test-suite"><span class="ts-name">benchmarks</span><span class="ts-count">19</span></div>
     </div>
 
     <div class="test-total">
       <div class="check-icon">&#10003;</div>
-      <span>137 tests + 11 benchmarks &mdash; all passing</span>
+      <span>168 tests + 19 benchmarks &mdash; all passing</span>
     </div>
 
     <!-- Highlight categories -->
@@ -1275,7 +1275,7 @@
         <div class="feature-icon fi-red">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-        <h3>Security Tests (28)</h3>
+        <h3>Security Tests (38)</h3>
         <p>TOCTOU race conditions, symlink escape, path traversal, setuid handling, hardlink bombs, circular symlinks, umask leaks, and permission escalation checks.</p>
       </div>
       <div class="feature-card">
@@ -1289,7 +1289,7 @@
         <div class="feature-icon fi-purple">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
-        <h3>Benchmarks (11)</h3>
+        <h3>Benchmarks (19)</h3>
         <p>Large files, many small files, mixed sizes, deep trees, symlinks, hardlinks, sparse files, parallel threshold sweep, and startup overhead measurement.</p>
       </div>
     </div>
@@ -1388,7 +1388,7 @@
       <div class="line"><span class="ln"> </span>  <span class="str">dir.rs</span>       <span class="cm">  # Recursive directory copy (fast + slow) 1030 lines</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">copy.rs</span>      <span class="cm">  # Single file copy logic                  335 lines</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">engine.rs</span>    <span class="cm">  # Copy engine (reflink/cfr/sendfile/rw)   199 lines</span></div>
-      <div class="line"><span class="ln"> </span>  <span class="str">metadata.rs</span>  <span class="cm">  # Permission, xattr, ACL, timestamps      225 lines</span></div>
+      <div class="line"><span class="ln"> </span>  <span class="str">metadata.rs</span>  <span class="cm">  # Permission, xattr, ACL, timestamps      237 lines</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">sparse.rs</span>    <span class="cm">  # Sparse file hole detection + copy       192 lines</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">error.rs</span>     <span class="cm">  # Error types (thiserror)                 145 lines</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">util.rs</span>      <span class="cm">  # Path utilities, target resolution        120 lines</span></div>
@@ -1397,7 +1397,7 @@
       <div class="line"><span class="ln"> </span></div>
       <div class="line"><span class="ln"> </span><span class="fn">tests/</span></div>
       <div class="line"><span class="ln"> </span>  <span class="str">common/mod.rs</span> <span class="cm"># Shared test harness (Env fixture)       194 lines</span></div>
-      <div class="line"><span class="ln"> </span>  <span class="str">12 test files</span> <span class="cm"># 137 tests + 11 benchmarks              2439 lines</span></div>
+      <div class="line"><span class="ln"> </span>  <span class="str">12 test files</span> <span class="cm"># 168 tests + 19 benchmarks              3560 lines</span></div>
     </div>
   </div>
 </section>
@@ -1409,7 +1409,8 @@
   <div class="container">
     <p>
       Built with <span class="heart">&hearts;</span> in Rust &mdash;
-      <a href="https://www.rust-lang.org">rust-lang.org</a>
+      <a href="https://github.com/yrbane/cp">GitHub</a> &mdash;
+      <a href="https://unlicense.org">Unlicense</a>
     </p>
   </div>
 </footer>
