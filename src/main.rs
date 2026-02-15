@@ -10,6 +10,7 @@ mod progress;
 mod sparse;
 mod util;
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -24,6 +25,7 @@ fn main() {
     let opts = CopyOptions::from_cli(&cli);
 
     let exit_code = run(&cli, &opts);
+    let _ = std::io::stderr().flush();
     process::exit(exit_code);
 }
 
