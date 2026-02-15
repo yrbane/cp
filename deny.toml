@@ -1,0 +1,30 @@
+[graph]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[advisories]
+# Deny any crate with a known vulnerability
+ignore = [
+    { id = "RUSTSEC-2025-0119", reason = "number_prefix is a transitive dep of indicatif, no alternative yet" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "Unlicense",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.8
+exceptions = [
+    { allow = ["LGPL-2.1"], crate = "acl-sys" },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
