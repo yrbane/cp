@@ -19,6 +19,7 @@ use crate::copy;
 use crate::error::{CpError, CpResult};
 use crate::metadata;
 use crate::options::{CopyOptions, Dereference};
+use crate::progress;
 use crate::util;
 
 /// Max chunk for copy_file_range (1 GiB — will return actual bytes for small files).
@@ -52,6 +53,8 @@ struct RawCopyState<'a> {
     need_dir_meta: bool,
     /// Deferred directory metadata: (src_path, dst_path, stat)
     dir_meta: Vec<(PathBuf, PathBuf, nix::libc::stat)>,
+    /// Progress counter for directory copy
+    progress: std::sync::Arc<progress::DirProgressCounter>,
 }
 
 /// Ultra-fast directory copy using raw libc: openat, readdir, mkdirat.
@@ -74,6 +77,9 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
         None
     };
 
+    let dir_pb = progress::make_dir_progress(&src.display().to_string(), opts.progress);
+    let progress_counter = std::sync::Arc::new(progress::DirProgressCounter::new(dir_pb));
+
     let mut state = RawCopyState {
         opts,
         hard_link_map: if opts.preserve_links {
@@ -89,6 +95,7 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
             || opts.preserve_acl,
         need_dir_meta: opts.preserve_mode || opts.preserve_ownership || opts.preserve_timestamps,
         dir_meta: Vec::new(),
+        progress: progress_counter,
     };
 
     // Save root directory metadata if needed
@@ -119,6 +126,8 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
             metadata::preserve_acl_pub(src_path, dst_path).ok();
         }
     }
+
+    state.progress.finish();
 
     Ok(())
 }
@@ -261,6 +270,7 @@ fn copy_dir_recurse(
     } else {
         for name in &reg_files {
             copy_file_openat(src_fd, dst_fd, name.as_c_str(), src_path, dst_path, state)?;
+            state.progress.inc();
         }
     }
 
@@ -285,6 +295,7 @@ fn copy_dir_recurse(
             dst_path,
             state.opts,
         )?;
+        state.progress.inc();
     }
 
     // Phase 4: Recurse into subdirectories
@@ -441,6 +452,7 @@ fn copy_files_parallel(
     let hlmap_ref = hlmap.as_ref();
     let err_ref = &first_err;
     let deferred_ref = &deferred_links;
+    let progress_ref = &state.progress;
 
     std::thread::scope(|scope| {
         for chunk in files.chunks(chunk_size) {
@@ -465,6 +477,7 @@ fn copy_files_parallel(
                         }
                         return;
                     }
+                    progress_ref.inc();
                 }
             });
         }
@@ -830,6 +843,9 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
     let need_dir_meta = opts.preserve_mode || opts.preserve_ownership || opts.preserve_timestamps;
     let mut dir_metadata: Vec<(PathBuf, PathBuf, fs::Metadata)> = Vec::new();
 
+    let dir_pb = progress::make_dir_progress(&src.display().to_string(), opts.progress);
+    let dir_progress = progress::DirProgressCounter::new(dir_pb);
+
     let mut pb: Option<ProgressBar> = None;
 
     let walker = WalkDir::new(src).follow_links(follow_links).min_depth(0);
@@ -939,7 +955,10 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
 
         let slow_pb = pb.get_or_insert_with(ProgressBar::hidden);
         copy::copy_single(path, &dest_path, opts, false, slow_pb)?;
+        dir_progress.inc();
     }
+
+    dir_progress.finish();
 
     for (src_path, dst_path, meta) in dir_metadata.iter().rev() {
         metadata::preserve_metadata(src_path, dst_path, meta, opts, false)?;

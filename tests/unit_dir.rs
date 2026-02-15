@@ -225,3 +225,21 @@ fn dir_very_wide() {
     assert_eq!(content(&e.p("dst/f_0250")), "content_250");
     assert_eq!(content(&e.p("dst/f_0499")), "content_499");
 }
+
+#[test]
+fn dir_progress_recursive() {
+    let e = Env::new();
+    for i in 0..10 {
+        e.file(&format!("src/f_{i}.txt"), format!("data_{i}"));
+    }
+
+    // --progress with -R should succeed and copy all files
+    cp().arg("-R")
+        .arg("--progress")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(file_count(&e.p("dst")), 10);
+}
