@@ -25,6 +25,7 @@ fn main() {
     let opts = CopyOptions::from_cli(&cli);
 
     let exit_code = run(&cli, &opts);
+    let _ = std::io::stdout().flush();
     let _ = std::io::stderr().flush();
     process::exit(exit_code);
 }
@@ -116,7 +117,7 @@ fn copy_source(
         dir::copy_directory(source, &target, opts)?;
 
         if opts.verbose {
-            eprintln!("'{}' -> '{}'", source.display(), target.display());
+            println!("'{}' -> '{}'", source.display(), target.display());
         }
     } else {
         // Ensure parent directory exists for --parents
@@ -136,6 +137,31 @@ fn copy_source(
         );
         copy::copy_single(source, &target, opts, true, &pb)?;
         pb.finish_and_clear();
+
+        // Preserve metadata of each intermediate source directory (after file copy,
+        // so directory mtime isn't overwritten by file creation)
+        if opts.parents {
+            let need_meta =
+                opts.preserve_mode || opts.preserve_ownership || opts.preserve_timestamps;
+            if need_meta {
+                if let Some(src_parent) = source.parent() {
+                    let src_stripped = src_parent.strip_prefix("/").unwrap_or(src_parent);
+                    let mut accumulated = PathBuf::new();
+                    for component in src_stripped.components() {
+                        accumulated.push(component);
+                        let src_dir = Path::new("/").join(&accumulated);
+                        let dst_dir = dest.join(&accumulated);
+                        if src_dir.is_dir() && dst_dir.is_dir() {
+                            if let Ok(meta) = std::fs::metadata(&src_dir) {
+                                let _ = metadata::preserve_metadata(
+                                    &src_dir, &dst_dir, &meta, opts, false,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(())

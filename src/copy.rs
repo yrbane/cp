@@ -57,7 +57,18 @@ pub fn copy_single(
         }
     }
 
-    // Same file check
+    // Backup before same-file check: if backup is active, renaming dst
+    // means src and dst are no longer the same file.
+    let backup_path = if dst_exists && opts.backup != crate::options::BackupMode::None {
+        backup::make_backup(dst, opts.backup, &opts.backup_suffix)
+    } else {
+        None
+    };
+
+    // Re-check dst after potential backup rename
+    let dst_exists = backup_path.as_ref().map_or(dst_exists, |_| false);
+
+    // Same file check (after backup, so renamed dst won't trigger this)
     if dst_exists && util::is_same_file(src, dst) {
         return Err(CpError::SameFile {
             src: src.to_path_buf(),
@@ -70,7 +81,12 @@ pub fn copy_single(
         && dst_exists
     {
         match update_mode {
-            UpdateMode::None | UpdateMode::NoneFail => return Ok(()),
+            UpdateMode::None => return Ok(()),
+            UpdateMode::NoneFail => {
+                return Err(CpError::UpdateSkipped {
+                    path: dst.to_path_buf(),
+                });
+            }
             UpdateMode::Older => {
                 if let Some(ref dm) = dst_meta
                     && dm.modified().ok() >= src_meta.modified().ok()
@@ -93,11 +109,6 @@ pub fn copy_single(
         && !util::prompt_yes(&format!("cp: overwrite '{}'? ", dst.display()))
     {
         return Ok(());
-    }
-
-    // Backup
-    if dst_exists {
-        backup::make_backup(dst, opts.backup, &opts.backup_suffix);
     }
 
     // Remove destination if requested
@@ -131,7 +142,16 @@ pub fn copy_single(
     }
 
     if opts.verbose {
-        eprintln!("'{}' -> '{}'", src.display(), dst.display());
+        if let Some(ref bp) = backup_path {
+            println!(
+                "'{}' -> '{}' (backup: '{}')",
+                src.display(),
+                dst.display(),
+                bp.display()
+            );
+        } else {
+            println!("'{}' -> '{}'", src.display(), dst.display());
+        }
     }
 
     Ok(())
@@ -317,12 +337,7 @@ fn do_symbolic_link(src: &Path, dst: &Path) -> CpResult<()> {
             source: e,
         })?;
     }
-    let abs_src = if src.is_absolute() {
-        src.to_path_buf()
-    } else {
-        std::env::current_dir().unwrap_or_default().join(src)
-    };
-    std::os::unix::fs::symlink(&abs_src, dst).map_err(|e| CpError::Symlink {
+    std::os::unix::fs::symlink(src, dst).map_err(|e| CpError::Symlink {
         dst: dst.to_path_buf(),
         source: e,
     })?;

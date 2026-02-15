@@ -145,7 +145,7 @@ impl CopyOptions {
         }
 
         // Resolve reflink
-        let reflink = cli.reflink.unwrap_or(ReflinkMode::Never);
+        let reflink = cli.reflink.unwrap_or(ReflinkMode::Auto);
 
         // Resolve sparse
         let sparse = cli.sparse.unwrap_or(SparseMode::Auto);

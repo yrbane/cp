@@ -166,6 +166,7 @@ fn copy_dir_recurse(
     let mut reg_files: Vec<CString> = Vec::new();
     let mut symlinks: Vec<CString> = Vec::new();
     let mut subdirs: Vec<(RawFd, RawFd, PathBuf, PathBuf)> = Vec::new();
+    let mut special_files: Vec<(CString, u8)> = Vec::new(); // (name, d_type)
 
     loop {
         unsafe { *nix::libc::__errno_location() = 0 };
@@ -258,7 +259,16 @@ fn copy_dir_recurse(
                     }
                 }
             }
-            _ => {} // skip sockets, devices, etc.
+            nix::libc::DT_FIFO | nix::libc::DT_CHR | nix::libc::DT_BLK => {
+                special_files.push((d_name.to_owned(), d_type));
+            }
+            nix::libc::DT_SOCK => {
+                eprintln!(
+                    "cp: warning: cannot copy socket '{}'",
+                    src_path.join(bytes_to_os(name_bytes)).display()
+                );
+            }
+            _ => {}
         }
     }
 
@@ -277,7 +287,7 @@ fn copy_dir_recurse(
     if state.opts.verbose {
         for name in &reg_files {
             let nb = name.as_bytes();
-            eprintln!(
+            println!(
                 "'{}' -> '{}'",
                 src_path.join(bytes_to_os(nb)).display(),
                 dst_path.join(bytes_to_os(nb)).display()
@@ -285,7 +295,71 @@ fn copy_dir_recurse(
         }
     }
 
-    // Phase 3: Copy symlinks (sequential — usually few)
+    // Phase 3: Create special files (FIFOs, devices)
+    for (name, dtype) in &special_files {
+        let name_os = bytes_to_os(name.as_bytes());
+        let src_special = src_path.join(name_os);
+        let dst_special = dst_path.join(name_os);
+
+        // fstatat to get mode and rdev
+        let mut stat: nix::libc::stat = unsafe { std::mem::zeroed() };
+        if unsafe {
+            nix::libc::fstatat(
+                src_fd,
+                name.as_ptr(),
+                &mut stat,
+                nix::libc::AT_SYMLINK_NOFOLLOW,
+            )
+        } != 0
+        {
+            eprintln!(
+                "cp: cannot stat '{}': {}",
+                src_special.display(),
+                std::io::Error::last_os_error()
+            );
+            continue;
+        }
+
+        // Remove existing destination if any
+        unsafe {
+            nix::libc::unlinkat(dst_fd, name.as_ptr(), 0);
+        }
+
+        let ret = if *dtype == nix::libc::DT_FIFO {
+            unsafe { nix::libc::mkfifoat(dst_fd, name.as_ptr(), stat.st_mode & 0o7777) }
+        } else {
+            let sflag = if *dtype == nix::libc::DT_BLK {
+                nix::libc::S_IFBLK
+            } else {
+                nix::libc::S_IFCHR
+            };
+            unsafe {
+                nix::libc::mknodat(
+                    dst_fd,
+                    name.as_ptr(),
+                    sflag | (stat.st_mode & 0o7777),
+                    stat.st_rdev,
+                )
+            }
+        };
+        if ret != 0 {
+            let err = std::io::Error::last_os_error();
+            // Tolerate EPERM for device nodes (non-root)
+            if err.raw_os_error() != Some(nix::libc::EPERM) {
+                return Err(CpError::MkNod {
+                    path: dst_special,
+                    source: nix::Error::last(),
+                });
+            }
+        }
+
+        if state.opts.verbose {
+            println!("'{}' -> '{}'", src_special.display(), dst_special.display());
+        }
+        state.progress.inc();
+    }
+
+    // Phase 4: Copy symlinks (sequential — usually few)
     for name in &symlinks {
         copy_symlink_at(
             src_fd,
@@ -642,7 +716,7 @@ fn copy_and_close(
         if state.opts.preserve_xattr {
             preserve_xattr_fd(src_fd, dst_fd);
         }
-        if state.opts.preserve_ownership && metadata::is_root() {
+        if state.opts.preserve_ownership {
             unsafe {
                 nix::libc::fchown(dst_fd, s.st_uid, s.st_gid);
             }
@@ -744,7 +818,7 @@ fn copy_symlink_at(
 
     if opts.verbose {
         let name_os = bytes_to_os(name.to_bytes());
-        eprintln!(
+        println!(
             "'{}' -> '{}'",
             src_dir_path.join(name_os).display(),
             dst_dir_path.join(name_os).display()
@@ -756,7 +830,7 @@ fn copy_symlink_at(
 
 /// Apply deferred directory metadata from raw stat.
 fn apply_dir_metadata(dst: &Path, stat: &nix::libc::stat, opts: &CopyOptions) -> CpResult<()> {
-    if opts.preserve_ownership && metadata::is_root() {
+    if opts.preserve_ownership {
         let c_path = CString::new(dst.as_os_str().as_bytes()).ok();
         if let Some(c) = c_path {
             unsafe {

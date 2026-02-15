@@ -123,6 +123,9 @@ pub enum CpError {
         source: std::io::Error,
     },
 
+    #[error("not replacing '{path}'")]
+    UpdateSkipped { path: PathBuf },
+
     #[error("failed to seek in '{path}': {source}")]
     Seek {
         path: PathBuf,

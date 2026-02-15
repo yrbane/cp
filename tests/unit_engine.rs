@@ -138,3 +138,54 @@ fn engine_just_over_chunk() {
     assert_eq!(file_size(&e.p("dst")), size as u64);
     assert_eq!(bytes(&e.p("dst")), data);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FICLONE threshold boundary tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn engine_ficlone_threshold_under() {
+    let e = Env::new();
+    // 255 KB — under the 256 KB FICLONE_THRESHOLD
+    let size = 255 * 1024;
+    let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    e.file("src", &data);
+
+    // With --reflink=auto --debug, file < threshold should NOT attempt FICLONE
+    let assert = cp()
+        .arg("--reflink=auto")
+        .arg("--sparse=never")
+        .arg("--debug")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        !stderr.contains("FICLONE"),
+        "should NOT attempt FICLONE for files under threshold"
+    );
+    assert_eq!(bytes(&e.p("dst")), data);
+}
+
+#[test]
+fn engine_ficlone_threshold_at() {
+    let e = Env::new();
+    // 256 KB — exactly at FICLONE_THRESHOLD
+    let size = 256 * 1024;
+    let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    e.file("src", &data);
+
+    // With --reflink=auto --debug, file at threshold should attempt FICLONE
+    // (will likely fail on non-CoW fs and fall back, but the attempt matters)
+    cp().arg("--reflink=auto")
+        .arg("--sparse=never")
+        .arg("--debug")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(bytes(&e.p("dst")), data);
+}

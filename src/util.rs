@@ -94,12 +94,16 @@ pub fn get_device(path: &Path) -> io::Result<u64> {
 }
 
 /// Prompt user on stderr and read y/n.
+/// Accepts common affirmatives across locales: y/yes/o/oui/j/ja/s/si/d/da.
 pub fn prompt_yes(msg: &str) -> bool {
     eprint!("{}", msg);
     let mut buf = String::new();
     if io::stdin().read_line(&mut buf).is_ok() {
         let answer = buf.trim().to_lowercase();
-        answer == "y" || answer == "yes"
+        matches!(
+            answer.as_str(),
+            "y" | "yes" | "o" | "oui" | "j" | "ja" | "s" | "si" | "d" | "da"
+        )
     } else {
         false
     }

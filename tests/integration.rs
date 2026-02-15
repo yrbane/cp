@@ -155,7 +155,7 @@ fn integ_verbose_format() {
         .output()
         .unwrap();
 
-    assert!(String::from_utf8_lossy(&out.stderr).contains("->"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("->"));
 }
 
 // ─── Exit codes ─────────────────────────────────────────────────────────────

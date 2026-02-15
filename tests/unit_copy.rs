@@ -187,7 +187,7 @@ fn copy_verbose() {
         .arg(e.p("dst"))
         .assert()
         .success()
-        .stderr(predicates::str::contains("->"));
+        .stdout(predicates::str::contains("->"));
 }
 
 #[test]
@@ -250,7 +250,8 @@ fn copy_update_none_fail_skips() {
         .arg(e.p("src"))
         .arg(e.p("dst"))
         .assert()
-        .success();
+        .failure()
+        .stderr(predicates::str::contains("not replacing"));
 
     assert_eq!(content(&e.p("dst")), "keep_me");
 }
@@ -497,6 +498,40 @@ fn copy_interactive_no_dest_no_prompt() {
 }
 
 #[test]
+fn copy_interactive_locale_oui() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "old");
+
+    // "oui" should be accepted as affirmative
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("oui\n")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "new");
+}
+
+#[test]
+fn copy_interactive_locale_ja() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "old");
+
+    // "ja" should be accepted as affirmative
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("ja\n")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "new");
+}
+
+#[test]
 fn copy_interactive_n_overrides_no_clobber() {
     let e = Env::new();
     e.file("src", "new");
@@ -573,4 +608,47 @@ fn copy_reflink_debug_shows_method() {
         .assert()
         .success()
         .stderr(predicates::str::contains("copy method:"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Backup verbose tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn copy_force_backup_same_file() {
+    let e = Env::new();
+    e.file("file", "content");
+
+    // Create a hard link so src and dst are the same file
+    e.hardlink("file", "link");
+    assert_eq!(ino(&e.p("file")), ino(&e.p("link")));
+
+    // --force --backup: backup dst first (rename), then copy succeeds
+    cp().arg("-f")
+        .arg("--backup=simple")
+        .arg(e.p("file"))
+        .arg(e.p("link"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("link")), "content");
+    assert_eq!(content(&e.p("link~")), "content");
+}
+
+#[test]
+fn copy_backup_verbose() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "old");
+
+    cp().arg("-v")
+        .arg("--backup=simple")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("(backup:"));
+
+    assert_eq!(content(&e.p("dst")), "new");
+    assert_eq!(content(&e.p("dst~")), "old");
 }

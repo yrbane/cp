@@ -300,17 +300,17 @@ fn opts_sparse_default_auto() {
 }
 
 #[test]
-fn opts_reflink_default_never() {
+fn opts_reflink_default_auto() {
     let e = Env::new();
     e.file("src", "data for reflink test");
 
-    // Without --reflink flag, default is never → should use copy_file_range
+    // Without --reflink flag, default is auto → should try FICLONE then fall back
     cp().arg("--debug")
         .arg(e.p("src"))
         .arg(e.p("dst"))
         .assert()
         .success()
-        .stderr(predicates::str::contains("copy_file_range"));
+        .stderr(predicates::str::contains("copy method:"));
 
     assert_eq!(content(&e.p("dst")), "data for reflink test");
 }
@@ -320,11 +320,11 @@ fn opts_debug_implies_verbose() {
     let e = Env::new();
     e.file("src", "content");
 
-    // --debug should imply verbose (outputs '->' message)
+    // --debug should imply verbose (outputs '->' message on stdout)
     cp().arg("--debug")
         .arg(e.p("src"))
         .arg(e.p("dst"))
         .assert()
         .success()
-        .stderr(predicates::str::contains("->"));
+        .stdout(predicates::str::contains("->"));
 }

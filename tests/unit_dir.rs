@@ -76,6 +76,31 @@ fn dir_parents_replicates_path() {
 }
 
 #[test]
+fn dir_parents_preserves_metadata() {
+    let e = Env::new();
+    // Use absolute paths — --parents replicates the full path under dest
+    let base = e.file("base/sub/file.txt", "content");
+    e.chmod("base/sub", 0o751);
+    e.set_mtime("base/sub", 1_500_000_000);
+    e.dir("dest");
+
+    cp().arg("--parents")
+        .arg("--preserve=mode,timestamps")
+        .arg(&base)
+        .arg(e.p("dest"))
+        .assert()
+        .success();
+
+    let expected = e.p("dest").join(base.strip_prefix("/").unwrap());
+    assert!(expected.exists());
+
+    // Check that the intermediate directory metadata was preserved
+    let sub_dir = e.p("dest").join(e.p("base/sub").strip_prefix("/").unwrap());
+    assert_eq!(mode(&sub_dir), 0o751);
+    assert_eq!(mtime(&sub_dir), 1_500_000_000);
+}
+
+#[test]
 fn dir_no_target_directory() {
     let e = Env::new();
     e.file("src/sub/file", "content");
@@ -227,6 +252,37 @@ fn dir_very_wide() {
 }
 
 #[test]
+fn dir_raw_path_with_fifo() {
+    use std::ffi::CString;
+
+    let e = Env::new();
+    e.dir("src");
+    e.file("src/regular.txt", "hello");
+
+    // Create a FIFO in the source directory
+    let fifo_path = e.p("src/my_fifo");
+    let c_path = CString::new(fifo_path.to_str().unwrap()).unwrap();
+    let ret = unsafe { nix::libc::mkfifo(c_path.as_ptr(), 0o644) };
+    assert_eq!(ret, 0, "mkfifo failed");
+
+    // Use -R without -L (fast path / raw path)
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/regular.txt")), "hello");
+    let dst_fifo = e.p("dst/my_fifo");
+    assert!(dst_fifo.exists());
+    let ft = std::fs::symlink_metadata(&dst_fifo).unwrap().file_type();
+    assert!(
+        std::os::unix::fs::FileTypeExt::is_fifo(&ft),
+        "destination should be a FIFO"
+    );
+}
+
+#[test]
 fn dir_progress_recursive() {
     let e = Env::new();
     for i in 0..10 {
@@ -242,4 +298,158 @@ fn dir_progress_recursive() {
         .success();
 
     assert_eq!(file_count(&e.p("dst")), 10);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// -R combination tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn dir_recursive_with_interactive() {
+    let e = Env::new();
+    e.file("src/a.txt", "aaa");
+    e.file("src/b.txt", "bbb");
+
+    // First copy to create existing files
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // Modify source
+    e.file("src/a.txt", "new_aaa");
+
+    // -R -i with "y\n" for each file
+    cp().arg("-R")
+        .arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("y\ny\n")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/src/a.txt")), "new_aaa");
+}
+
+#[test]
+fn dir_recursive_with_no_clobber() {
+    let e = Env::new();
+    e.file("src/a.txt", "original");
+
+    // First copy: -T so dst doesn't nest
+    cp().arg("-RT")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/a.txt")), "original");
+
+    // Modify source
+    e.file("src/a.txt", "changed");
+
+    // -R -n -T: should skip existing files
+    cp().arg("-RT")
+        .arg("-n")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/a.txt")), "original");
+}
+
+#[test]
+fn dir_recursive_with_backup() {
+    let e = Env::new();
+    e.file("src/a.txt", "original");
+
+    // First copy: dst doesn't exist → copies src content into dst
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/a.txt")), "original");
+
+    // Modify source
+    e.file("src2/a.txt", "updated");
+
+    // Copy src2 into dst as "src2" subdir — pre-populate dst/src2/a.txt
+    // so the next copy has something to backup
+    cp().arg("-R")
+        .arg(e.p("src2"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+    assert_eq!(content(&e.p("dst/src2/a.txt")), "updated");
+
+    // Modify src2 again
+    e.file("src2/a.txt", "final");
+
+    // -R --backup=simple: dst/src2/a.txt exists → backup to dst/src2/a.txt~
+    cp().arg("-R")
+        .arg("--backup=simple")
+        .arg(e.p("src2"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/src2/a.txt")), "final");
+    assert_eq!(content(&e.p("dst/src2/a.txt~")), "updated");
+}
+
+#[test]
+fn dir_recursive_with_update() {
+    let e = Env::new();
+    e.file("src/a.txt", "old_src");
+    e.set_mtime("src/a.txt", 1_000_000);
+
+    // First copy
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    // dst/src/a.txt now exists with current mtime (newer)
+    // Source has old mtime → -u should skip
+    cp().arg("-R")
+        .arg("-u")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst/src/a.txt")), "old_src");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// xattr in raw path test
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn dir_raw_preserves_xattr() {
+    let e = Env::new();
+    e.file("src/file.txt", "content");
+
+    // Try to set an xattr on the source file
+    let src_path = e.p("src/file.txt");
+    if xattr::set(&src_path, "user.test", b"value").is_err() {
+        // xattr not supported on this filesystem, skip test
+        return;
+    }
+
+    cp().arg("-R")
+        .arg("--preserve=xattr")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    let dst_path = e.p("dst/file.txt");
+    let val = xattr::get(&dst_path, "user.test").unwrap();
+    assert_eq!(val, Some(b"value".to_vec()));
 }

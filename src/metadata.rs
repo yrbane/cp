@@ -8,18 +8,6 @@ use crate::options::CopyOptions;
 
 const ENOTSUP: i32 = 95; // linux ENOTSUP
 
-/// Cached: are we running as root? (checked once)
-static IS_ROOT: AtomicBool = AtomicBool::new(false);
-static ROOT_CHECKED: AtomicBool = AtomicBool::new(false);
-
-pub fn is_root() -> bool {
-    if !ROOT_CHECKED.load(Ordering::Relaxed) {
-        IS_ROOT.store(unsafe { nix::libc::geteuid() } == 0, Ordering::Relaxed);
-        ROOT_CHECKED.store(true, Ordering::Relaxed);
-    }
-    IS_ROOT.load(Ordering::Relaxed)
-}
-
 /// Cached: does the filesystem support xattr? (reset on ENOTSUP)
 static XATTR_SUPPORTED: AtomicBool = AtomicBool::new(true);
 
@@ -41,8 +29,8 @@ pub fn preserve_metadata(
     }
 
     // 2. Ownership (before chmod, since chown can clear setuid/setgid)
-    // Skip entirely for non-root — chown always fails with EPERM
-    if opts.preserve_ownership && is_root() {
+    // Try chown even as non-root — preserve_ownership tolerates EPERM
+    if opts.preserve_ownership {
         preserve_ownership(dst, src_meta, is_symlink)?;
     }
 
