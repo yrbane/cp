@@ -427,3 +427,150 @@ fn copy_dangling_symlink_dest_force_succeeds() {
 
     assert_eq!(content(&e.p("dst")), "content");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Interactive mode tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn copy_interactive_no_input_skips() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "keep_me");
+
+    // -i with piped stdin (no TTY) → reads EOF → no overwrite
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "keep_me");
+}
+
+#[test]
+fn copy_interactive_yes_overwrites() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "old");
+
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("y\n")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "new");
+}
+
+#[test]
+fn copy_interactive_no_preserves() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "old");
+
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .write_stdin("n\n")
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "old");
+}
+
+#[test]
+fn copy_interactive_no_dest_no_prompt() {
+    let e = Env::new();
+    e.file("src", "content");
+
+    // No existing dest → no prompt, just copy
+    cp().arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "content");
+}
+
+#[test]
+fn copy_interactive_n_overrides_no_clobber() {
+    let e = Env::new();
+    e.file("src", "new");
+    e.file("dst", "keep_me");
+
+    // -n -i: -n wins (no-clobber overrides interactive)
+    cp().arg("-n")
+        .arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "keep_me");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Reflink mode tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn copy_reflink_never() {
+    let e = Env::new();
+    e.file("src", "data for reflink never test");
+
+    cp().arg("--reflink=never")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "data for reflink never test");
+}
+
+#[test]
+fn copy_reflink_auto() {
+    let e = Env::new();
+    e.file("src", "data for reflink auto test");
+
+    // --reflink=auto: tries FICLONE, falls back to copy_file_range
+    cp().arg("--reflink=auto")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "data for reflink auto test");
+}
+
+#[test]
+fn copy_reflink_always_may_fail() {
+    let e = Env::new();
+    e.file("src", "data");
+
+    // --reflink=always on non-CoW filesystem may fail (or succeed on btrfs/xfs)
+    // Just verify it doesn't panic
+    let _ = cp()
+        .arg("--reflink=always")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .ok();
+}
+
+#[test]
+fn copy_reflink_debug_shows_method() {
+    let e = Env::new();
+    e.file("src", "debug reflink test");
+
+    // --reflink=auto with --debug should show the copy method used
+    cp().arg("--reflink=auto")
+        .arg("--debug")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("copy method:"));
+}
