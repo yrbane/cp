@@ -344,25 +344,26 @@ fn copy_file_openat(
     // Hard link detection using the fstat we already did
     if let Some(hlmap) = state.hard_link_map.as_mut()
         && let Some(ref s) = stat
-            && s.st_nlink > 1 {
-                let key = (s.st_dev, s.st_ino);
-                let name_os = bytes_to_os(name.to_bytes());
-                let dst_file_path = dst_dir_path.join(name_os);
-                if let Some(first_dest) = hlmap.get(&key) {
-                    unsafe { nix::libc::close(src_fd) };
-                    // unlinkat + linkat relative to dir fd
-                    unsafe {
-                        nix::libc::unlinkat(dst_dir_fd, name.as_ptr(), 0);
-                    }
-                    fs::hard_link(first_dest, &dst_file_path).map_err(|e| CpError::HardLink {
-                        src: first_dest.clone(),
-                        dst: dst_file_path,
-                        source: e,
-                    })?;
-                    return Ok(());
-                }
-                hlmap.insert(key, dst_file_path);
+        && s.st_nlink > 1
+    {
+        let key = (s.st_dev, s.st_ino);
+        let name_os = bytes_to_os(name.to_bytes());
+        let dst_file_path = dst_dir_path.join(name_os);
+        if let Some(first_dest) = hlmap.get(&key) {
+            unsafe { nix::libc::close(src_fd) };
+            // unlinkat + linkat relative to dir fd
+            unsafe {
+                nix::libc::unlinkat(dst_dir_fd, name.as_ptr(), 0);
             }
+            fs::hard_link(first_dest, &dst_file_path).map_err(|e| CpError::HardLink {
+                src: first_dest.clone(),
+                dst: dst_file_path,
+                source: e,
+            })?;
+            return Ok(());
+        }
+        hlmap.insert(key, dst_file_path);
+    }
 
     // Create destination: openat relative to dir fd
     let dst_fd = unsafe {
@@ -535,23 +536,24 @@ fn copy_file_openat_mt(
     // Hard link detection with Mutex — defer link creation to avoid race conditions
     if let Some(hlm) = hlmap
         && let Some(ref s) = stat
-            && s.st_nlink > 1 {
-                let key = (s.st_dev, s.st_ino);
-                let name_os = bytes_to_os(name.to_bytes());
-                let dst_file = dst_dir_path.join(name_os);
-                let mut guard = hlm.lock().unwrap();
-                if let Some(first) = guard.get(&key) {
-                    // Another thread already claimed this inode — defer the hard link
-                    let first = first.clone();
-                    drop(guard);
-                    unsafe { nix::libc::close(src_fd) };
-                    deferred_links.lock().unwrap().push((first, dst_file));
-                    return Ok(());
-                }
-                // First occurrence: register in map, then copy the file below
-                guard.insert(key, dst_file);
-                drop(guard);
-            }
+        && s.st_nlink > 1
+    {
+        let key = (s.st_dev, s.st_ino);
+        let name_os = bytes_to_os(name.to_bytes());
+        let dst_file = dst_dir_path.join(name_os);
+        let mut guard = hlm.lock().unwrap();
+        if let Some(first) = guard.get(&key) {
+            // Another thread already claimed this inode — defer the hard link
+            let first = first.clone();
+            drop(guard);
+            unsafe { nix::libc::close(src_fd) };
+            deferred_links.lock().unwrap().push((first, dst_file));
+            return Ok(());
+        }
+        // First occurrence: register in map, then copy the file below
+        guard.insert(key, dst_file);
+        drop(guard);
+    }
 
     let dst_fd = unsafe {
         nix::libc::openat(
@@ -622,38 +624,39 @@ fn copy_and_close(
 
     // Preserve metadata using fd-based syscalls
     if state.need_file_meta
-        && let Some(s) = stat {
-            if state.opts.preserve_xattr {
-                preserve_xattr_fd(src_fd, dst_fd);
-            }
-            if state.opts.preserve_ownership && metadata::is_root() {
-                unsafe {
-                    nix::libc::fchown(dst_fd, s.st_uid, s.st_gid);
-                }
-            }
-            if state.opts.preserve_mode {
-                unsafe {
-                    nix::libc::fchmod(dst_fd, s.st_mode);
-                }
-            }
-            if state.opts.preserve_timestamps {
-                let atime = nix::libc::timespec {
-                    tv_sec: s.st_atime,
-                    tv_nsec: s.st_atime_nsec,
-                };
-                let mtime = nix::libc::timespec {
-                    tv_sec: s.st_mtime,
-                    tv_nsec: s.st_mtime_nsec,
-                };
-                let times = [atime, mtime];
-                unsafe {
-                    nix::libc::futimens(dst_fd, times.as_ptr());
-                }
-            }
-            if state.opts.preserve_acl {
-                preserve_acl_fd(src_fd, dst_fd);
+        && let Some(s) = stat
+    {
+        if state.opts.preserve_xattr {
+            preserve_xattr_fd(src_fd, dst_fd);
+        }
+        if state.opts.preserve_ownership && metadata::is_root() {
+            unsafe {
+                nix::libc::fchown(dst_fd, s.st_uid, s.st_gid);
             }
         }
+        if state.opts.preserve_mode {
+            unsafe {
+                nix::libc::fchmod(dst_fd, s.st_mode);
+            }
+        }
+        if state.opts.preserve_timestamps {
+            let atime = nix::libc::timespec {
+                tv_sec: s.st_atime,
+                tv_nsec: s.st_atime_nsec,
+            };
+            let mtime = nix::libc::timespec {
+                tv_sec: s.st_mtime,
+                tv_nsec: s.st_mtime_nsec,
+            };
+            let times = [atime, mtime];
+            unsafe {
+                nix::libc::futimens(dst_fd, times.as_ptr());
+            }
+        }
+        if state.opts.preserve_acl {
+            preserve_acl_fd(src_fd, dst_fd);
+        }
+    }
 
     unsafe {
         nix::libc::close(src_fd);
@@ -858,9 +861,10 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
         if ft.is_dir() {
             if let Some(dev) = src_dev
                 && let Ok(m) = fs::metadata(path)
-                    && m.dev() != dev {
-                        continue;
-                    }
+                && m.dev() != dev
+            {
+                continue;
+            }
 
             if !dest_path.exists() {
                 fs::create_dir_all(&dest_path).map_err(|e| CpError::CreateDir {
@@ -890,9 +894,10 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
                 fs::symlink_metadata(path)
             };
             if let Ok(meta) = meta
-                && meta.dev() != dev {
-                    continue;
-                }
+                && meta.dev() != dev
+            {
+                continue;
+            }
         }
 
         if let Some(parent) = dest_path.parent() {
@@ -914,24 +919,23 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
         // Handle hard links in slow path
         if let Some(ref mut hlmap) = hard_link_map
             && !ft.is_symlink()
-                && let Ok(meta) = fs::symlink_metadata(path)
-                    && meta.nlink() > 1 {
-                        let key = (meta.dev(), meta.ino());
-                        if let Some(first_dest) = hlmap.get(&key) {
-                            if dest_path.exists() {
-                                let _ = fs::remove_file(&dest_path);
-                            }
-                            fs::hard_link(first_dest, &dest_path).map_err(|e| {
-                                CpError::HardLink {
-                                    src: first_dest.clone(),
-                                    dst: dest_path.clone(),
-                                    source: e,
-                                }
-                            })?;
-                            continue;
-                        }
-                        hlmap.insert(key, dest_path.clone());
-                    }
+            && let Ok(meta) = fs::symlink_metadata(path)
+            && meta.nlink() > 1
+        {
+            let key = (meta.dev(), meta.ino());
+            if let Some(first_dest) = hlmap.get(&key) {
+                if dest_path.exists() {
+                    let _ = fs::remove_file(&dest_path);
+                }
+                fs::hard_link(first_dest, &dest_path).map_err(|e| CpError::HardLink {
+                    src: first_dest.clone(),
+                    dst: dest_path.clone(),
+                    source: e,
+                })?;
+                continue;
+            }
+            hlmap.insert(key, dest_path.clone());
+        }
 
         let slow_pb = pb.get_or_insert_with(ProgressBar::hidden);
         copy::copy_single(path, &dest_path, opts, false, slow_pb)?;

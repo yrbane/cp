@@ -41,9 +41,10 @@ impl Env {
     #[inline]
     fn ensure_parent(p: &Path) {
         if let Some(parent) = p.parent()
-            && !parent.exists() {
-                fs::create_dir_all(parent).unwrap();
-            }
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).unwrap();
+        }
     }
 
     /// Public variant for use in test-local helpers (e.g. sparse file creation).

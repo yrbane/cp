@@ -95,12 +95,13 @@ fn copy_source(
         // Check we're not copying into self
         if let Ok(canon_src) = std::fs::canonicalize(source)
             && let Ok(canon_dst) = std::fs::canonicalize(&target)
-                && canon_dst.starts_with(&canon_src) {
-                    return Err(CpError::CopyIntoSelf {
-                        path: source.to_path_buf(),
-                        dest: target.clone(),
-                    });
-                }
+            && canon_dst.starts_with(&canon_src)
+        {
+            return Err(CpError::CopyIntoSelf {
+                path: source.to_path_buf(),
+                dest: target.clone(),
+            });
+        }
 
         dir::copy_directory(source, &target, opts)?;
 
@@ -110,12 +111,13 @@ fn copy_source(
     } else {
         // Ensure parent directory exists for --parents
         if opts.parents
-            && let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| CpError::CreateDir {
-                    path: parent.to_path_buf(),
-                    source: e,
-                })?;
-            }
+            && let Some(parent) = target.parent()
+        {
+            std::fs::create_dir_all(parent).map_err(|e| CpError::CreateDir {
+                path: parent.to_path_buf(),
+                source: e,
+            })?;
+        }
 
         let pb = progress::make_file_progress(
             src_meta.len(),

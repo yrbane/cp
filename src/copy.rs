@@ -57,18 +57,20 @@ pub fn copy_single(
 
     // Update check
     if let Some(update_mode) = opts.update
-        && dst_exists {
-            match update_mode {
-                UpdateMode::None | UpdateMode::NoneFail => return Ok(()),
-                UpdateMode::Older => {
-                    if let Some(ref dm) = dst_meta
-                        && dm.modified().ok() >= src_meta.modified().ok() {
-                            return Ok(());
-                        }
+        && dst_exists
+    {
+        match update_mode {
+            UpdateMode::None | UpdateMode::NoneFail => return Ok(()),
+            UpdateMode::Older => {
+                if let Some(ref dm) = dst_meta
+                    && dm.modified().ok() >= src_meta.modified().ok()
+                {
+                    return Ok(());
                 }
-                UpdateMode::All => {} // always copy
             }
+            UpdateMode::All => {} // always copy
         }
+    }
 
     // No-clobber check
     if opts.no_clobber && dst_exists {
@@ -76,10 +78,12 @@ pub fn copy_single(
     }
 
     // Interactive check
-    if opts.interactive && dst_exists
-        && !util::prompt_yes(&format!("cp: overwrite '{}'? ", dst.display())) {
-            return Ok(());
-        }
+    if opts.interactive
+        && dst_exists
+        && !util::prompt_yes(&format!("cp: overwrite '{}'? ", dst.display()))
+    {
+        return Ok(());
+    }
 
     // Backup
     if dst_exists {

@@ -228,9 +228,10 @@ fn preserve_acl(src: &Path, dst: &Path) -> CpResult<()> {
 
     // Also try default ACL for directories
     if src.is_dir()
-        && let Ok(mut acl) = posix_acl::PosixACL::read_default_acl(src) {
-            let _ = acl.write_default_acl(dst);
-        }
+        && let Ok(mut acl) = posix_acl::PosixACL::read_default_acl(src)
+    {
+        let _ = acl.write_default_acl(dst);
+    }
 
     Ok(())
 }

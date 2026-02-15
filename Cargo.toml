@@ -2,6 +2,7 @@
 name = "cp"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["yrbane"]
 description = "A modern GNU-compatible cp implementation in Rust — zero-copy I/O, parallel directory copy, sparse file detection"
 license = "Unlicense"
