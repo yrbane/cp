@@ -10,6 +10,7 @@ repository = "https://github.com/yrbane/cp"
 keywords = ["cp", "copy", "filesystem", "cli", "unix"]
 categories = ["command-line-utilities", "filesystem"]
 readme = "README.md"
+exclude = ["html/", "scripts/", "fuzz/", ".github/", "bench-results.json"]
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
