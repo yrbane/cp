@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'benches/**'
+      - 'tests/copy_bench.rs'
       - 'Cargo.toml'
   workflow_dispatch:
 
