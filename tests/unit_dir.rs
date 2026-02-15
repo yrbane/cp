@@ -10,7 +10,11 @@ fn dir_basic_recursive() {
     e.file("src/a/f2.txt", "two");
     e.file("src/a/b/f3.txt", "three");
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/f1.txt")), "one");
     assert_eq!(content(&e.p("dst/a/f2.txt")), "two");
@@ -23,7 +27,11 @@ fn dir_recursive_into_existing() {
     e.file("src/file.txt", "content");
     e.dir("dst");
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/src/file.txt")), "content");
 }
@@ -34,10 +42,17 @@ fn dir_archive_preserves_symlinks() {
     e.file("src/real.txt", "content");
     e.symlink("real.txt", "src/link.txt");
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/link.txt")));
-    assert_eq!(link_target(&e.p("dst/link.txt")).to_str().unwrap(), "real.txt");
+    assert_eq!(
+        link_target(&e.p("dst/link.txt")).to_str().unwrap(),
+        "real.txt"
+    );
 }
 
 #[test]
@@ -46,10 +61,18 @@ fn dir_parents_replicates_path() {
     let base = e.file("base/sub/file.txt", "content");
     e.dir("dest");
 
-    cp().arg("--parents").arg(&base).arg(e.p("dest")).assert().success();
+    cp().arg("--parents")
+        .arg(&base)
+        .arg(e.p("dest"))
+        .assert()
+        .success();
 
     let expected = e.p("dest").join(base.strip_prefix("/").unwrap());
-    assert!(expected.exists(), "file should exist at: {}", expected.display());
+    assert!(
+        expected.exists(),
+        "file should exist at: {}",
+        expected.display()
+    );
 }
 
 #[test]
@@ -57,7 +80,11 @@ fn dir_no_target_directory() {
     let e = Env::new();
     e.file("src/sub/file", "content");
 
-    cp().arg("-RT").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-RT")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/sub/file")), "content");
 }
@@ -69,7 +96,11 @@ fn dir_preserve_hard_links() {
     e.hardlink("src/a", "src/b");
     assert_eq!(ino(&e.p("src/a")), ino(&e.p("src/b")));
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(ino(&e.p("dst/a")), ino(&e.p("dst/b")));
 }
@@ -93,7 +124,11 @@ fn dir_empty_directory() {
     let e = Env::new();
     e.dir("empty");
 
-    cp().arg("-R").arg(e.p("empty")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("empty"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(e.p("dst").is_dir());
 }
@@ -105,7 +140,12 @@ fn dir_target_directory_flag() {
     e.file("b.txt", "b");
     e.dir("dest");
 
-    cp().arg("-t").arg(e.p("dest")).arg(e.p("a.txt")).arg(e.p("b.txt")).assert().success();
+    cp().arg("-t")
+        .arg(e.p("dest"))
+        .arg(e.p("a.txt"))
+        .arg(e.p("b.txt"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dest/a.txt")), "a");
     assert_eq!(content(&e.p("dest/b.txt")), "b");
@@ -116,7 +156,11 @@ fn dir_deep_nesting() {
     let e = Env::new();
     e.file("deep/a/b/c/d/e/f/g/h/leaf.txt", "deep");
 
-    cp().arg("-R").arg(e.p("deep")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("deep"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/a/b/c/d/e/f/g/h/leaf.txt")), "deep");
 }
@@ -142,7 +186,12 @@ fn dir_with_fifo() {
 
     // Use -R -L (dereference=Always) to trigger the walkdir slow path
     // which properly handles FIFOs via copy_single → copy_fifo
-    cp().arg("-R").arg("-L").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-L")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     // Regular file should be copied
     assert_eq!(content(&e.p("dst/regular.txt")), "hello");
@@ -164,7 +213,11 @@ fn dir_very_wide() {
         e.file(&format!("wide/f_{i:04}"), format!("content_{i}"));
     }
 
-    cp().arg("-R").arg(e.p("wide")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("wide"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_count(&e.p("dst")), 500);
     // Verify a sample of files

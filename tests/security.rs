@@ -11,24 +11,37 @@ use std::io::{Seek, SeekFrom, Write};
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn sec_symlink_outside_source_not_followed_with_P() {
+fn sec_symlink_outside_source_not_followed_with_p_flag() {
     let e = Env::new();
     e.dir("src");
     e.symlink("/etc/hostname", "src/escape");
 
-    cp().arg("-R").arg("-P").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-P")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/escape")));
-    assert_eq!(link_target(&e.p("dst/escape")).to_str().unwrap(), "/etc/hostname");
+    assert_eq!(
+        link_target(&e.p("dst/escape")).to_str().unwrap(),
+        "/etc/hostname"
+    );
 }
 
 #[test]
-fn sec_symlink_followed_with_L_copies_content() {
+fn sec_symlink_followed_with_l_flag_copies_content() {
     let e = Env::new();
     e.dir("src");
     e.symlink("/etc/hostname", "src/linked");
 
-    cp().arg("-R").arg("-L").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-L")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(!is_symlink(&e.p("dst/linked")));
 }
@@ -37,9 +50,12 @@ fn sec_symlink_followed_with_L_copies_content() {
 fn sec_same_file_via_symlink() {
     let e = Env::new();
     e.file("real.txt", "content");
-    e.symlink(&e.p("real.txt"), "link.txt");
+    e.symlink(e.p("real.txt"), "link.txt");
 
-    cp().arg(e.p("link.txt")).arg(e.p("real.txt")).assert().failure()
+    cp().arg(e.p("link.txt"))
+        .arg(e.p("real.txt"))
+        .assert()
+        .failure()
         .stderr(predicates::str::contains("same file"));
 }
 
@@ -71,14 +87,21 @@ fn sec_force_overwrites_readonly() {
     e.file("src", "new");
     e.file_mode("dst", "protected", 0o000);
 
-    cp().arg("-f").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-f")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "new");
 }
 
 #[test]
 fn sec_nonexistent_source() {
-    cp().arg("/nonexistent/path/file").arg("/tmp/dst").assert().failure()
+    cp().arg("/nonexistent/path/file")
+        .arg("/tmp/dst")
+        .assert()
+        .failure()
         .stderr(predicates::str::contains("cannot stat"));
 }
 
@@ -87,7 +110,10 @@ fn sec_unreadable_source() {
     let e = Env::new();
     e.file_mode("unreadable", "secret", 0o000);
 
-    cp().arg(e.p("unreadable")).arg(e.p("dst")).assert().failure();
+    cp().arg(e.p("unreadable"))
+        .arg(e.p("dst"))
+        .assert()
+        .failure();
 
     e.chmod("unreadable", 0o644); // cleanup
 }
@@ -99,7 +125,12 @@ fn sec_circular_symlink() {
     e.symlink("b", "src/a");
     e.symlink("a", "src/b");
 
-    cp().arg("-R").arg("-P").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-P")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/a")));
     assert!(is_symlink(&e.p("dst/b")));
@@ -111,10 +142,18 @@ fn sec_dangling_symlink_no_deref() {
     e.dir("src");
     e.symlink("/nonexistent/target", "src/dangling");
 
-    cp().arg("-R").arg("-P").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-P")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/dangling")));
-    assert_eq!(link_target(&e.p("dst/dangling")).to_str().unwrap(), "/nonexistent/target");
+    assert_eq!(
+        link_target(&e.p("dst/dangling")).to_str().unwrap(),
+        "/nonexistent/target"
+    );
 }
 
 #[test]
@@ -125,7 +164,11 @@ fn sec_many_files() {
         e.file(&format!("many/file_{i:04}"), format!("content {i}"));
     }
 
-    cp().arg("-R").arg(e.p("many")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("many"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_count(&e.p("dst")), 1000);
 }
@@ -135,19 +178,31 @@ fn sec_special_chars_in_filename() {
     let e = Env::new();
     e.dir("src");
     let names = [
-        "file with spaces", "file\twith\ttabs", "file'with'quotes",
-        "file\"with\"doublequotes", "file;with;semicolons",
-        "file&with&ampersands", "file|with|pipes",
-        "file(with)parens", "file[with]brackets",
+        "file with spaces",
+        "file\twith\ttabs",
+        "file'with'quotes",
+        "file\"with\"doublequotes",
+        "file;with;semicolons",
+        "file&with&ampersands",
+        "file|with|pipes",
+        "file(with)parens",
+        "file[with]brackets",
     ];
     for name in &names {
         e.file(&format!("src/{name}"), format!("content of {name}"));
     }
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     for name in &names {
-        assert_eq!(content(&e.p(&format!("dst/{name}"))), format!("content of {name}"));
+        assert_eq!(
+            content(&e.p(&format!("dst/{name}"))),
+            format!("content of {name}")
+        );
     }
 }
 
@@ -160,7 +215,11 @@ fn sec_unicode_filenames() {
         e.file(&format!("src/{name}"), name.as_bytes());
     }
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     for name in &names {
         assert_eq!(content(&e.p(&format!("dst/{name}"))), *name);
@@ -171,7 +230,9 @@ fn sec_unicode_filenames() {
 fn sec_data_integrity_random() {
     use rand::Rng;
     let e = Env::new();
-    let data: Vec<u8> = (0..1024 * 1024).map(|_| rand::rng().random::<u8>()).collect();
+    let data: Vec<u8> = (0..1024 * 1024)
+        .map(|_| rand::rng().random::<u8>())
+        .collect();
     e.file("random", &data);
 
     cp().arg(e.p("random")).arg(e.p("dst")).assert().success();
@@ -191,7 +252,11 @@ fn sec_permissions_not_escalated() {
 
 #[test]
 fn sec_exit_code_on_error() {
-    let out = cp().arg("/totally/nonexistent").arg("/tmp/whatever").output().unwrap();
+    let out = cp()
+        .arg("/totally/nonexistent")
+        .arg("/tmp/whatever")
+        .output()
+        .unwrap();
     assert_ne!(out.status.code().unwrap(), 0);
 }
 
@@ -203,9 +268,12 @@ fn sec_exit_code_on_error() {
 fn sec_toctou_same_file_via_symlink() {
     let e = Env::new();
     e.file("original.txt", "important data");
-    e.symlink(&e.p("original.txt"), "link_to_src");
+    e.symlink(e.p("original.txt"), "link_to_src");
 
-    cp().arg(e.p("original.txt")).arg(e.p("link_to_src")).assert().failure()
+    cp().arg(e.p("original.txt"))
+        .arg(e.p("link_to_src"))
+        .assert()
+        .failure()
         .stderr(predicates::str::contains("same file"));
 
     assert_eq!(content(&e.p("original.txt")), "important data");
@@ -217,10 +285,18 @@ fn sec_path_traversal_recursive() {
     e.dir("src");
     e.symlink("/etc/hostname", "src/escape");
 
-    cp().arg("-R").arg("-P").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-P")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/escape")));
-    assert_eq!(link_target(&e.p("dst/escape")).to_str().unwrap(), "/etc/hostname");
+    assert_eq!(
+        link_target(&e.p("dst/escape")).to_str().unwrap(),
+        "/etc/hostname"
+    );
 }
 
 #[test]
@@ -230,7 +306,11 @@ fn sec_setuid_not_preserved_default() {
 
     cp().arg(e.p("src")).arg(e.p("dst")).assert().success();
 
-    assert_eq!(mode(&e.p("dst")) & 0o4000, 0, "setuid should NOT be preserved without -p");
+    assert_eq!(
+        mode(&e.p("dst")) & 0o4000,
+        0,
+        "setuid should NOT be preserved without -p"
+    );
 }
 
 #[test]
@@ -238,7 +318,11 @@ fn sec_setuid_preserved_with_p() {
     let e = Env::new();
     e.file_mode("src", "#!/bin/sh\necho hi", 0o4755);
 
-    cp().arg("--preserve=mode").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mode(&e.p("dst")), 0o4755);
 }
@@ -250,19 +334,27 @@ fn sec_extremely_long_path() {
     for depth in 0..200 {
         let seg = "d".repeat((depth % 10) + 2);
         current = current.join(&seg);
-        if current.to_str().map_or(true, |s| s.len() > 3000) {
+        if current.to_str().is_none_or(|s| s.len() > 3000) {
             break;
         }
     }
     fs::create_dir_all(&current).unwrap();
     fs::write(current.join("leaf.txt"), "deep data").unwrap();
 
-    let result = cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).output().unwrap();
+    let result = cp()
+        .arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .output()
+        .unwrap();
 
     if result.status.success() {
         let rel = current.strip_prefix(e.path()).unwrap();
         let dst_leaf = e.path().join("dst").join(rel.strip_prefix("src").unwrap());
-        assert_eq!(fs::read_to_string(dst_leaf.join("leaf.txt")).unwrap(), "deep data");
+        assert_eq!(
+            fs::read_to_string(dst_leaf.join("leaf.txt")).unwrap(),
+            "deep data"
+        );
     }
     // Either success or clean error — no panic
 }
@@ -275,7 +367,11 @@ fn sec_hardlink_bomb_dedup() {
         e.hardlink("src/original.dat", &format!("src/link_{i:04}"));
     }
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     let orig_ino = ino(&e.p("dst/original.dat"));
     for i in 0..500 {
@@ -292,7 +388,12 @@ fn sec_deep_symlink_chain() {
         e.symlink(format!("link_{:02}", i - 1), &format!("src/link_{i:02}"));
     }
 
-    cp().arg("-R").arg("-L").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-L")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(!is_symlink(&e.p("dst/link_19")));
     assert_eq!(content(&e.p("dst/link_19")), "target data");
@@ -312,7 +413,11 @@ fn sec_sparse_block_boundary() {
         f.set_len(20480).unwrap();
     }
 
-    cp().arg("--sparse=auto").arg(e.p("sparse_src")).arg(e.p("sparse_dst")).assert().success();
+    cp().arg("--sparse=auto")
+        .arg(e.p("sparse_src"))
+        .arg(e.p("sparse_dst"))
+        .assert()
+        .success();
 
     assert_eq!(bytes(&e.p("sparse_src")), bytes(&e.p("sparse_dst")));
 }
@@ -332,7 +437,12 @@ fn sec_one_file_system_skips() {
     let e = Env::new();
     e.file("src/local.txt", "local data");
 
-    cp().arg("-R").arg("-x").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-x")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/local.txt")), "local data");
 }
@@ -344,7 +454,11 @@ fn sec_empty_dir_permissions() {
     e.dir("src/restricted");
     e.chmod("src/restricted", 0o700);
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mode(&e.p("dst/restricted")), 0o700);
 }
@@ -355,7 +469,11 @@ fn sec_overwrite_dir_with_file() {
     e.file("src_file", "I am a file");
     e.dir("dst_dir");
 
-    let out = cp().arg(e.p("src_file")).arg(e.p("dst_dir")).output().unwrap();
+    let out = cp()
+        .arg(e.p("src_file"))
+        .arg(e.p("dst_dir"))
+        .output()
+        .unwrap();
 
     if out.status.success() {
         assert!(e.p("dst_dir/src_file").exists());
@@ -399,7 +517,10 @@ fn sec_fifo_copy() {
     assert_eq!(ret, 0, "mkfifo failed");
 
     // Single file FIFO copy (not recursive)
-    cp().arg(e.p("my_fifo")).arg(e.p("dst_fifo")).assert().success();
+    cp().arg(e.p("my_fifo"))
+        .arg(e.p("dst_fifo"))
+        .assert()
+        .success();
 
     let ft = fs::symlink_metadata(e.p("dst_fifo")).unwrap().file_type();
     assert!(
@@ -429,8 +550,8 @@ fn sec_socket_copy_warning() {
 fn sec_same_file_two_symlinks() {
     let e = Env::new();
     e.file("real.txt", "data");
-    e.symlink(&e.p("real.txt"), "link_a");
-    e.symlink(&e.p("real.txt"), "link_b");
+    e.symlink(e.p("real.txt"), "link_a");
+    e.symlink(e.p("real.txt"), "link_b");
 
     // Two different symlinks pointing to the same inode → "same file"
     cp().arg(e.p("link_a"))
@@ -446,10 +567,7 @@ fn sec_filename_255_chars() {
     let long_name = "x".repeat(255);
     e.file(&long_name, "content");
 
-    cp().arg(e.p(&long_name))
-        .arg(e.p("dst"))
-        .assert()
-        .success();
+    cp().arg(e.p(&long_name)).arg(e.p("dst")).assert().success();
 
     assert_eq!(content(&e.p("dst")), "content");
 }
@@ -458,7 +576,7 @@ fn sec_filename_255_chars() {
 fn sec_copy_into_self_via_symlink() {
     let e = Env::new();
     e.file("dir/file", "data");
-    e.symlink(&e.p("dir"), "link_to_dir");
+    e.symlink(e.p("dir"), "link_to_dir");
 
     // cp -R dir link_to_dir/sub → should detect copy-into-self
     e.dir("dir/sub");
@@ -493,7 +611,11 @@ fn sec_force_readonly_file() {
     e.file_mode("dst", "protected", 0o000);
 
     // -f should unlink the readonly file and create a new one
-    cp().arg("-f").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-f")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "new data");
 }
@@ -505,7 +627,11 @@ fn sec_update_older_skips_newer() {
     e.set_mtime("src", 1_000_000);
     e.file("dst", "newer_content"); // dst has current (newer) mtime
 
-    cp().arg("-u").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-u")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     // dst should remain unchanged (newer)
     assert_eq!(content(&e.p("dst")), "newer_content");

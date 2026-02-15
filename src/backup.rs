@@ -4,11 +4,7 @@ use crate::options::BackupMode;
 
 /// Make a backup of the destination file if it exists.
 /// Returns the backup path if a backup was created.
-pub fn make_backup(
-    dest: &Path,
-    mode: BackupMode,
-    suffix: &str,
-) -> Option<PathBuf> {
+pub fn make_backup(dest: &Path, mode: BackupMode, suffix: &str) -> Option<PathBuf> {
     if mode == BackupMode::None || !dest.exists() {
         return None;
     }

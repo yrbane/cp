@@ -15,7 +15,11 @@ fn meta_xattr_preserved() {
         return;
     }
 
-    cp().arg("--preserve=xattr").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--preserve=xattr")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     match xattr::get(e.p("dst"), "user.test") {
         Ok(Some(val)) => assert_eq!(val, b"hello"),
@@ -50,7 +54,11 @@ fn meta_mode_and_timestamps() {
     e.file_mode("src", "content", 0o751);
     e.set_mtime("src", 1_500_000_000);
 
-    cp().arg("-p").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-p")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mode(&e.p("dst")), 0o751);
     assert_eq!(mtime(&e.p("dst")), 1_500_000_000);
@@ -64,7 +72,11 @@ fn meta_timestamps_nanosecond() {
     e.file("src", "content");
     e.set_mtime_ns("src", 1_600_000_000, 123_456_789);
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mtime_nsec(&e.p("src")), mtime_nsec(&e.p("dst")));
 }
@@ -78,7 +90,11 @@ fn meta_symlink_timestamps() {
     e.symlink("target", "src/link");
     e.set_symlink_mtime("src/link", 1_400_000_000);
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/link")));
     assert_eq!(symlink_mtime(&e.p("dst/link")), 1_400_000_000);
@@ -118,7 +134,11 @@ fn meta_p_flag_not_xattr() {
         return;
     }
 
-    cp().arg("-p").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-p")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     if let Ok(Some(_)) = xattr::get(e.p("dst"), "user.test") {
         panic!("-p should NOT preserve xattr");
@@ -140,7 +160,11 @@ fn meta_acl_preserved() {
         }
     }
 
-    cp().arg("--preserve=all").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--preserve=all")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(posix_acl::PosixACL::read_acl(e.p("dst")).is_ok());
 }

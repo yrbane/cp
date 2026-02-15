@@ -56,12 +56,7 @@ pub fn resolve_target(
 }
 
 /// Get the final destination path for a source file being copied.
-pub fn build_dest_path(
-    source: &Path,
-    dest: &Path,
-    dest_is_dir: bool,
-    parents: bool,
-) -> PathBuf {
+pub fn build_dest_path(source: &Path, dest: &Path, dest_is_dir: bool, parents: bool) -> PathBuf {
     if dest_is_dir {
         if parents {
             // --parents: replicate full source path under dest
@@ -85,11 +80,7 @@ pub fn get_metadata(path: &Path, follow: bool) -> io::Result<fs::Metadata> {
 }
 
 /// Check if we should follow symlinks for this path.
-pub fn should_follow_symlink(
-    _path: &Path,
-    deref: Dereference,
-    is_command_line_arg: bool,
-) -> bool {
+pub fn should_follow_symlink(_path: &Path, deref: Dereference, is_command_line_arg: bool) -> bool {
     match deref {
         Dereference::Always => true,
         Dereference::Never => false,
@@ -100,11 +91,6 @@ pub fn should_follow_symlink(
 /// Get the device ID of a path's filesystem.
 pub fn get_device(path: &Path) -> io::Result<u64> {
     fs::metadata(path).map(|m| m.dev())
-}
-
-/// Check if a path is a directory, following symlinks.
-pub fn path_is_dir(path: &Path) -> bool {
-    fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
 }
 
 /// Prompt user on stderr and read y/n.

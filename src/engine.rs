@@ -86,18 +86,12 @@ pub fn copy_file_data(
 
 /// Try to clone via FICLONE ioctl.
 fn try_ficlone(src: &File, dst: &File) -> Result<(), ()> {
-    let ret =
-        unsafe { nix::libc::ioctl(dst.as_raw_fd(), FICLONE, src.as_raw_fd()) };
+    let ret = unsafe { nix::libc::ioctl(dst.as_raw_fd(), FICLONE, src.as_raw_fd()) };
     if ret == 0 { Ok(()) } else { Err(()) }
 }
 
 /// Try copy_file_range syscall in a loop, feeding progress.
-fn try_copy_file_range(
-    src: &File,
-    dst: &File,
-    size: u64,
-    pb: &ProgressBar,
-) -> Result<u64, ()> {
+fn try_copy_file_range(src: &File, dst: &File, size: u64, pb: &ProgressBar) -> Result<u64, ()> {
     let mut copied: u64 = 0;
 
     while copied < size {
@@ -115,7 +109,8 @@ fn try_copy_file_range(
         if ret < 0 {
             let err = std::io::Error::last_os_error();
             let errno = err.raw_os_error().unwrap_or(0);
-            if errno == nix::libc::ENOSYS || errno == nix::libc::EXDEV || errno == nix::libc::EINVAL {
+            if errno == nix::libc::ENOSYS || errno == nix::libc::EXDEV || errno == nix::libc::EINVAL
+            {
                 if copied == 0 {
                     return Err(());
                 }

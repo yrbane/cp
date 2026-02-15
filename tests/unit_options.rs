@@ -10,7 +10,11 @@ fn opts_archive_enables_recursive() {
     let e = Env::new();
     e.file("src/sub/file.txt", "deep");
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/sub/file.txt")), "deep");
 }
@@ -22,7 +26,11 @@ fn opts_archive_preserves_mode() {
     let e = Env::new();
     e.file_mode("src", "content", 0o751);
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mode(&e.p("dst")), 0o751);
 }
@@ -35,7 +43,11 @@ fn opts_archive_preserves_timestamps() {
     e.file("src", "content");
     e.set_mtime("src", 1_500_000_000);
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mtime(&e.p("dst")), 1_500_000_000);
 }
@@ -48,10 +60,17 @@ fn opts_archive_preserves_symlinks() {
     e.file("src/real.txt", "data");
     e.symlink("real.txt", "src/link.txt");
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/link.txt")));
-    assert_eq!(link_target(&e.p("dst/link.txt")).to_str().unwrap(), "real.txt");
+    assert_eq!(
+        link_target(&e.p("dst/link.txt")).to_str().unwrap(),
+        "real.txt"
+    );
 }
 
 // ─── --preserve then --no-preserve cancels ───────────────────────────────────
@@ -96,9 +115,12 @@ fn opts_no_preserve_all() {
 fn opts_dereference_default_follows() {
     let e = Env::new();
     e.file("target.txt", "real content");
-    e.symlink(&e.p("target.txt"), "link.txt");
+    e.symlink(e.p("target.txt"), "link.txt");
 
-    cp().arg(e.p("link.txt")).arg(e.p("dst.txt")).assert().success();
+    cp().arg(e.p("link.txt"))
+        .arg(e.p("dst.txt"))
+        .assert()
+        .success();
 
     assert!(!is_symlink(&e.p("dst.txt")));
     assert_eq!(content(&e.p("dst.txt")), "real content");
@@ -107,12 +129,16 @@ fn opts_dereference_default_follows() {
 // ─── -R default implies -P: symlinks preserved ──────────────────────────────
 
 #[test]
-fn opts_dereference_R_default_P() {
+fn opts_dereference_r_default_p() {
     let e = Env::new();
     e.file("src/target", "data");
     e.symlink("target", "src/link");
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst/link")));
 }
@@ -120,12 +146,17 @@ fn opts_dereference_R_default_P() {
 // ─── -R -L follows all symlinks ──────────────────────────────────────────────
 
 #[test]
-fn opts_dereference_L_follows_all() {
+fn opts_dereference_l_follows_all() {
     let e = Env::new();
     e.file("src/target", "data");
     e.symlink("target", "src/link");
 
-    cp().arg("-R").arg("-L").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg("-L")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(!is_symlink(&e.p("dst/link")));
     assert_eq!(content(&e.p("dst/link")), "data");
@@ -177,7 +208,12 @@ fn opts_no_clobber_overrides_interactive() {
     e.file("src", "new");
     e.file("dst", "keep_me");
 
-    cp().arg("-n").arg("-i").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-n")
+        .arg("-i")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "keep_me");
 }
@@ -225,7 +261,7 @@ fn opts_dereference_h_cli_only() {
     let e = Env::new();
     e.file("src/target", "data");
     e.symlink("target", "src/deep_link");
-    e.symlink(&e.p("src"), "top_link");
+    e.symlink(e.p("src"), "top_link");
 
     // -R -H: follow symlink on command line (top_link), but NOT deep links
     cp().arg("-R")
@@ -258,10 +294,7 @@ fn opts_sparse_default_auto() {
     }
 
     // Without --sparse flag, default is auto → should succeed with sparse handling
-    cp().arg(e.p("sparse"))
-        .arg(e.p("dst"))
-        .assert()
-        .success();
+    cp().arg(e.p("sparse")).arg(e.p("dst")).assert().success();
 
     assert_eq!(bytes(&e.p("sparse")), bytes(&e.p("dst")));
 }

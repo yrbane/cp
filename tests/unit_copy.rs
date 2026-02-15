@@ -19,7 +19,11 @@ fn copy_no_clobber() {
     e.file("src", "new");
     e.file("dst", "keep_me");
 
-    cp().arg("-n").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-n")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "keep_me");
 }
@@ -31,7 +35,11 @@ fn copy_update_older_skips_newer_dest() {
     e.set_mtime("src", 1_000_000);
     e.file("dst", "new"); // dst has current mtime (newer)
 
-    cp().arg("-u").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-u")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "new");
 }
@@ -43,7 +51,11 @@ fn copy_update_older_overwrites_older_dest() {
     e.set_mtime("dst", 1_000_000);
     e.file("src", "new"); // src has current mtime (newer)
 
-    cp().arg("-u").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-u")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "new");
 }
@@ -54,7 +66,11 @@ fn copy_force_removes_readonly() {
     e.file("src", "new");
     e.file_mode("dst", "readonly", 0o444);
 
-    cp().arg("-f").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-f")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst")), "new");
 }
@@ -64,7 +80,11 @@ fn copy_hard_link() {
     let e = Env::new();
     e.file("src", "content");
 
-    cp().arg("-l").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-l")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(ino(&e.p("src")), ino(&e.p("dst")));
 }
@@ -74,7 +94,11 @@ fn copy_symbolic_link() {
     let e = Env::new();
     e.file("src", "content");
 
-    cp().arg("-s").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-s")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst")));
     assert_eq!(content(&e.p("dst")), "content");
@@ -85,7 +109,11 @@ fn copy_preserve_mode() {
     let e = Env::new();
     e.file_mode("src", "content", 0o751);
 
-    cp().arg("--preserve=mode").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--preserve=mode")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mode(&e.p("dst")), 0o751);
 }
@@ -96,7 +124,11 @@ fn copy_preserve_timestamps() {
     e.file("src", "content");
     e.set_mtime("src", 1_500_000_000);
 
-    cp().arg("--preserve=timestamps").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--preserve=timestamps")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(mtime(&e.p("dst")), 1_500_000_000);
 }
@@ -105,9 +137,13 @@ fn copy_preserve_timestamps() {
 fn copy_symlink_no_deref() {
     let e = Env::new();
     e.file("target", "real");
-    e.symlink(&e.p("target"), "link");
+    e.symlink(e.p("target"), "link");
 
-    cp().arg("-P").arg(e.p("link")).arg(e.p("dst")).assert().success();
+    cp().arg("-P")
+        .arg(e.p("link"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(is_symlink(&e.p("dst")));
     assert_eq!(link_target(&e.p("dst")), e.p("target"));
@@ -117,9 +153,13 @@ fn copy_symlink_no_deref() {
 fn copy_symlink_deref() {
     let e = Env::new();
     e.file("target", "real content");
-    e.symlink(&e.p("target"), "link");
+    e.symlink(e.p("target"), "link");
 
-    cp().arg("-L").arg(e.p("link")).arg(e.p("dst")).assert().success();
+    cp().arg("-L")
+        .arg(e.p("link"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert!(!is_symlink(&e.p("dst")));
     assert_eq!(content(&e.p("dst")), "real content");
@@ -272,7 +312,7 @@ fn copy_attributes_only_preserves_existing() {
 fn copy_symlink_to_dir_without_r() {
     let e = Env::new();
     e.dir("target_dir");
-    e.symlink(&e.p("target_dir"), "link_to_dir");
+    e.symlink(e.p("target_dir"), "link_to_dir");
 
     // -L follows the symlink → sees a directory → "omitting directory"
     cp().arg("-L")
@@ -300,7 +340,7 @@ fn copy_overwrite_existing_symlink() {
     let e = Env::new();
     e.file("src", "real data");
     e.file("other", "other content");
-    e.symlink(&e.p("other"), "dst");
+    e.symlink(e.p("other"), "dst");
 
     assert!(is_symlink(&e.p("dst")));
 

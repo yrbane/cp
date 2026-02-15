@@ -10,15 +10,12 @@ fn main() {
 }
 
 fn generate_man_page() {
-    use clap::CommandFactory;
-
     // We need to define a minimal version of the CLI struct here
     // since build scripts can't depend on the crate being built.
     let cmd = build_cli_command();
 
     let man = clap_mangen::Man::new(cmd);
-    let out_dir =
-        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_else(|_| ".".into()));
+    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_else(|_| ".".into()));
     let mut buf = Vec::new();
     man.render(&mut buf).expect("Failed to render man page");
     std::fs::write(out_dir.join("cp.1"), buf).expect("Failed to write man page");

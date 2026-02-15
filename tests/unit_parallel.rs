@@ -18,7 +18,11 @@ fn parallel_below_threshold() {
     let e = Env::new();
     populate(&e, 63);
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_count(&e.p("dst")), 63);
 }
@@ -30,7 +34,11 @@ fn parallel_at_threshold() {
     let e = Env::new();
     populate(&e, 64);
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_count(&e.p("dst")), 64);
 }
@@ -42,7 +50,11 @@ fn parallel_many_files() {
     let e = Env::new();
     populate(&e, 200);
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_count(&e.p("dst")), 200);
     for i in [0, 50, 99, 150, 199] {
@@ -60,7 +72,11 @@ fn parallel_preserves_hard_links() {
         e.hardlink(&format!("src/f_{i:04}"), &format!("src/link_{i:04}"));
     }
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     for i in 0..50 {
         assert_eq!(
@@ -81,7 +97,11 @@ fn parallel_with_metadata() {
         e.file_mode(&format!("src/f_{i:04}"), format!("data_{i}"), 0o755);
     }
 
-    cp().arg("-a").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-a")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     for i in [0, 25, 50, 75, 99] {
         assert_eq!(mode(&e.p(&format!("dst/f_{i:04}"))), 0o755);
@@ -96,7 +116,11 @@ fn parallel_error_unreadable() {
     populate(&e, 100);
     e.chmod("src/f_0050", 0o000);
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().failure();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .failure();
 
     // Cleanup for TempDir removal
     e.chmod("src/f_0050", 0o644);
@@ -121,7 +145,11 @@ fn parallel_mixed_types() {
         e.file(&format!("src/dir_{i}/inner.txt"), format!("inner_{i}"));
     }
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst/f_0000")), "data_0");
     assert!(is_symlink(&e.p("dst/sym_0000")));
@@ -146,7 +174,11 @@ fn parallel_data_integrity() {
         expected.push((format!("dst/f_{i:04}"), data));
     }
 
-    cp().arg("-R").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     for (rel, data) in &expected {
         assert_eq!(&bytes(&e.p(rel)), data, "integrity mismatch: {rel}");

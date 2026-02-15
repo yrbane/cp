@@ -59,9 +59,11 @@ pub enum CpError {
     NotADirectory { path: PathBuf },
 
     #[error("cannot overwrite non-directory '{dst}' with directory '{src}'")]
+    #[allow(dead_code)]
     OverwriteNonDir { src: PathBuf, dst: PathBuf },
 
     #[error("will not overwrite just-created '{path}' with '{src}'")]
+    #[allow(dead_code)]
     WillNotOverwrite { path: PathBuf, src: PathBuf },
 
     #[error("cannot copy '{src}' to '{dst}': {reason}")]
@@ -72,10 +74,7 @@ pub enum CpError {
     },
 
     #[error("failed to preserve ownership of '{path}': {source}")]
-    Chown {
-        path: PathBuf,
-        source: nix::Error,
-    },
+    Chown { path: PathBuf, source: nix::Error },
 
     #[error("failed to preserve permissions of '{path}': {source}")]
     Chmod {
@@ -112,10 +111,7 @@ pub enum CpError {
     },
 
     #[error("cannot create special file '{path}': {source}")]
-    MkNod {
-        path: PathBuf,
-        source: nix::Error,
-    },
+    MkNod { path: PathBuf, source: nix::Error },
 
     #[error("cannot read symbolic link '{path}': {source}")]
     ReadLink {
@@ -124,6 +120,7 @@ pub enum CpError {
     },
 
     #[error("not writing through dangling symlink '{path}'")]
+    #[allow(dead_code)]
     DanglingSymlink { path: PathBuf },
 
     #[error("cannot remove '{path}': {source}")]
@@ -139,6 +136,7 @@ pub enum CpError {
     },
 
     #[error("{0}")]
+    #[allow(dead_code)]
     Other(String),
 }
 

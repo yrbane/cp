@@ -1,4 +1,4 @@
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::path::Path;
 
@@ -56,21 +56,19 @@ pub fn copy_single(
     }
 
     // Update check
-    if let Some(update_mode) = opts.update {
-        if dst_exists {
+    if let Some(update_mode) = opts.update
+        && dst_exists {
             match update_mode {
                 UpdateMode::None | UpdateMode::NoneFail => return Ok(()),
                 UpdateMode::Older => {
-                    if let Some(ref dm) = dst_meta {
-                        if dm.modified().ok() >= src_meta.modified().ok() {
+                    if let Some(ref dm) = dst_meta
+                        && dm.modified().ok() >= src_meta.modified().ok() {
                             return Ok(());
                         }
-                    }
                 }
                 UpdateMode::All => {} // always copy
             }
         }
-    }
 
     // No-clobber check
     if opts.no_clobber && dst_exists {
@@ -78,14 +76,10 @@ pub fn copy_single(
     }
 
     // Interactive check
-    if opts.interactive && dst_exists {
-        if !util::prompt_yes(&format!(
-            "cp: overwrite '{}'? ",
-            dst.display()
-        )) {
+    if opts.interactive && dst_exists
+        && !util::prompt_yes(&format!("cp: overwrite '{}'? ", dst.display())) {
             return Ok(());
         }
-    }
 
     // Backup
     if dst_exists {
@@ -94,10 +88,12 @@ pub fn copy_single(
 
     // Remove destination if requested
     if opts.remove_destination && dst_exists {
-        fs::remove_file(dst).or_else(|_| fs::remove_dir_all(dst)).map_err(|e| CpError::Remove {
-            path: dst.to_path_buf(),
-            source: e,
-        })?;
+        fs::remove_file(dst)
+            .or_else(|_| fs::remove_dir_all(dst))
+            .map_err(|e| CpError::Remove {
+                path: dst.to_path_buf(),
+                source: e,
+            })?;
     }
 
     let file_type = src_meta.file_type();
@@ -115,10 +111,7 @@ pub fn copy_single(
     } else if file_type.is_block_device() || file_type.is_char_device() {
         copy_device(dst, &src_meta, opts)?;
     } else if file_type.is_socket() {
-        eprintln!(
-            "cp: warning: cannot copy socket '{}'",
-            src.display()
-        );
+        eprintln!("cp: warning: cannot copy socket '{}'", src.display());
     } else {
         copy_regular_file(src, dst, &src_meta, opts, pb)?;
     }
@@ -174,15 +167,7 @@ fn copy_regular_file(
         if use_sparse {
             let mut src_f = src_file;
             let mut dst_f = dst_file;
-            if sparse::copy_sparse(
-                &mut src_f,
-                &mut dst_f,
-                size,
-                src,
-                dst,
-                opts.sparse,
-                pb,
-            )? {
+            if sparse::copy_sparse(&mut src_f, &mut dst_f, size, src, dst, opts.sparse, pb)? {
                 if opts.debug {
                     eprintln!("cp: copy method: sparse (SEEK_HOLE/SEEK_DATA)");
                 }
@@ -199,16 +184,14 @@ fn copy_regular_file(
             })?;
             let dst_file = open_dest_create(dst, opts)?;
 
-            let method = engine::copy_file_data(
-                &src_file, &dst_file, size, src, dst, opts.reflink, pb,
-            )?;
+            let method =
+                engine::copy_file_data(&src_file, &dst_file, size, src, dst, opts.reflink, pb)?;
             if opts.debug {
                 eprintln!("cp: copy method: {}", method);
             }
         } else {
-            let method = engine::copy_file_data(
-                &src_file, &dst_file, size, src, dst, opts.reflink, pb,
-            )?;
+            let method =
+                engine::copy_file_data(&src_file, &dst_file, size, src, dst, opts.reflink, pb)?;
             if opts.debug {
                 eprintln!("cp: copy method: {}", method);
             }
@@ -323,9 +306,7 @@ fn do_symbolic_link(src: &Path, dst: &Path) -> CpResult<()> {
     let abs_src = if src.is_absolute() {
         src.to_path_buf()
     } else {
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join(src)
+        std::env::current_dir().unwrap_or_default().join(src)
     };
     std::os::unix::fs::symlink(&abs_src, dst).map_err(|e| CpError::Symlink {
         dst: dst.to_path_buf(),

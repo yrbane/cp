@@ -25,7 +25,7 @@ fn create_many_files(dir: &Path, count: usize, size: usize) {
     fs::create_dir_all(dir).unwrap();
     for i in 0..count {
         let path = dir.join(format!("file_{:06}", i));
-        fs::write(&path, &vec![0xCDu8; size]).unwrap();
+        fs::write(&path, vec![0xCDu8; size]).unwrap();
     }
 }
 
@@ -94,7 +94,7 @@ fn bench_large_file_100mb() {
     });
 
     let our_sparse_dst = tmp.path().join("our_sparse_dst");
-    let our_sparse_time = bench_single("our cp (sparse=auto)", || {
+    let _our_sparse_time = bench_single("our cp (sparse=auto)", || {
         let _ = fs::remove_file(&our_sparse_dst);
         Command::new(our_cp())
             .arg(&src)
@@ -106,7 +106,10 @@ fn bench_large_file_100mb() {
     // Verify correctness
     assert_eq!(fs::read(&gnu_dst).unwrap(), fs::read(&our_dst).unwrap());
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Many small files ────────────────────────────────────────────
@@ -141,7 +144,10 @@ fn bench_many_small_files() {
             .unwrap();
     });
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Sparse file ─────────────────────────────────────────────────
@@ -176,7 +182,10 @@ fn bench_sparse_file() {
             .unwrap();
     });
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Preserve metadata ───────────────────────────────────────────
@@ -211,7 +220,10 @@ fn bench_preserve_metadata() {
             .unwrap();
     });
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Empty file ──────────────────────────────────────────────────
@@ -365,7 +377,7 @@ fn bench_symlink_heavy() {
 
     // 100 real files
     for i in 0..100 {
-        fs::write(src.join(format!("f_{:04}", i)), &vec![0xAAu8; 1024]).unwrap();
+        fs::write(src.join(format!("f_{:04}", i)), vec![0xAAu8; 1024]).unwrap();
     }
     // 400 symlinks pointing to those files
     for i in 0..400 {
@@ -417,7 +429,7 @@ fn bench_hardlink_heavy() {
     // 50 real files × 20 hardlinks each = 1000 entries
     for i in 0..50 {
         let orig = src.join(format!("f_{:04}", i));
-        fs::write(&orig, &vec![0xBBu8; 4096]).unwrap();
+        fs::write(&orig, vec![0xBBu8; 4096]).unwrap();
         for j in 1..20 {
             fs::hard_link(&orig, src.join(format!("f_{:04}_hl_{:02}", i, j))).unwrap();
         }
@@ -495,11 +507,7 @@ fn bench_single_file_startup() {
     for _ in 0..RUNS {
         let _ = fs::remove_file(&dst);
         let start = Instant::now();
-        Command::new(our_cp())
-            .arg(&src)
-            .arg(&dst)
-            .output()
-            .unwrap();
+        Command::new(our_cp()).arg(&src).arg(&dst).output().unwrap();
         total += start.elapsed();
     }
 
@@ -540,12 +548,12 @@ fn bench_1gb_file() {
     });
 
     // Verify correctness (just size to avoid 1GB memcmp)
-    assert_eq!(
-        fs::metadata(&our_dst).unwrap().len(),
-        1024 * 1024 * 1024,
-    );
+    assert_eq!(fs::metadata(&our_dst).unwrap().len(), 1024 * 1024 * 1024,);
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: 10K tiny files ───────────────────────────────────────────────
@@ -580,7 +588,10 @@ fn bench_ten_thousand_tiny() {
             .unwrap();
     });
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Metadata overhead ────────────────────────────────────────────
@@ -670,7 +681,10 @@ fn bench_sparse_fragmented() {
             .unwrap();
     });
 
-    eprintln!("  Speedup vs GNU: {:.1}x", gnu_time.as_secs_f64() / our_time.as_secs_f64());
+    eprintln!(
+        "  Speedup vs GNU: {:.1}x",
+        gnu_time.as_secs_f64() / our_time.as_secs_f64()
+    );
 }
 
 // ─── Benchmark: Attributes only ──────────────────────────────────────────────
@@ -735,11 +749,7 @@ fn bench_update_mode() {
     // Touch half the source files to make them newer
     for i in 0..500 {
         let p = src.join(format!("file_{:06}", i));
-        filetime::set_file_mtime(
-            &p,
-            filetime::FileTime::from_unix_time(2_000_000_000, 0),
-        )
-        .unwrap();
+        filetime::set_file_mtime(&p, filetime::FileTime::from_unix_time(2_000_000_000, 0)).unwrap();
     }
 
     eprintln!("\n=== Update mode: -u vs plain (1000 files, 50% newer) ===");

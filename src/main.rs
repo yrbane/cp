@@ -10,7 +10,7 @@ mod progress;
 mod sparse;
 mod util;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::Parser;
@@ -30,18 +30,22 @@ fn main() {
 fn run(cli: &Cli, opts: &CopyOptions) -> i32 {
     // Resolve sources and destination
     let paths: Vec<PathBuf> = if opts.strip_trailing_slashes {
-        cli.paths.iter().map(|p| util::strip_trailing_slashes(p)).collect()
+        cli.paths
+            .iter()
+            .map(|p| util::strip_trailing_slashes(p))
+            .collect()
     } else {
         cli.paths.clone()
     };
 
-    let (sources, dest) = match util::resolve_target(&paths, &opts.target_directory, opts.no_target_directory) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("cp: {}", e);
-            return 1;
-        }
-    };
+    let (sources, dest) =
+        match util::resolve_target(&paths, &opts.target_directory, opts.no_target_directory) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("cp: {}", e);
+                return 1;
+            }
+        };
 
     let dest_is_dir = dest.is_dir();
     let multiple_sources = sources.len() > 1;
@@ -65,15 +69,15 @@ fn run(cli: &Cli, opts: &CopyOptions) -> i32 {
 }
 
 fn copy_source(
-    source: &PathBuf,
-    dest: &PathBuf,
+    source: &Path,
+    dest: &Path,
     dest_is_dir: bool,
     opts: &CopyOptions,
 ) -> Result<(), CpError> {
     // Check source exists
     let follow = util::should_follow_symlink(source, opts.dereference, true);
     let src_meta = util::get_metadata(source, follow).map_err(|e| CpError::Stat {
-        path: source.clone(),
+        path: source.to_path_buf(),
         source: e,
     })?;
 
@@ -81,7 +85,7 @@ fn copy_source(
 
     if is_dir && !opts.recursive {
         return Err(CpError::OmitDirectory {
-            path: source.clone(),
+            path: source.to_path_buf(),
         });
     }
 
@@ -89,16 +93,14 @@ fn copy_source(
 
     if is_dir {
         // Check we're not copying into self
-        if let Ok(canon_src) = std::fs::canonicalize(source) {
-            if let Ok(canon_dst) = std::fs::canonicalize(&target) {
-                if canon_dst.starts_with(&canon_src) {
+        if let Ok(canon_src) = std::fs::canonicalize(source)
+            && let Ok(canon_dst) = std::fs::canonicalize(&target)
+                && canon_dst.starts_with(&canon_src) {
                     return Err(CpError::CopyIntoSelf {
-                        path: source.clone(),
+                        path: source.to_path_buf(),
                         dest: target.clone(),
                     });
                 }
-            }
-        }
 
         dir::copy_directory(source, &target, opts)?;
 
@@ -107,16 +109,19 @@ fn copy_source(
         }
     } else {
         // Ensure parent directory exists for --parents
-        if opts.parents {
-            if let Some(parent) = target.parent() {
+        if opts.parents
+            && let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| CpError::CreateDir {
                     path: parent.to_path_buf(),
                     source: e,
                 })?;
             }
-        }
 
-        let pb = progress::make_file_progress(src_meta.len(), &source.display().to_string(), opts.progress);
+        let pb = progress::make_file_progress(
+            src_meta.len(),
+            &source.display().to_string(),
+            opts.progress,
+        );
         copy::copy_single(source, &target, opts, true, &pb)?;
         pb.finish_and_clear();
     }

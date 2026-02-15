@@ -10,26 +10,42 @@ use std::path::PathBuf;
 
 #[test]
 fn strip_trailing_single_slash() {
-    let s = PathBuf::from("/tmp/foo/").to_string_lossy().trim_end_matches('/').to_string();
+    let s = PathBuf::from("/tmp/foo/")
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
     assert_eq!(s, "/tmp/foo");
 }
 
 #[test]
 fn strip_trailing_multiple_slashes() {
-    let s = PathBuf::from("/tmp/foo///").to_string_lossy().trim_end_matches('/').to_string();
+    let s = PathBuf::from("/tmp/foo///")
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
     assert_eq!(s, "/tmp/foo");
 }
 
 #[test]
 fn strip_trailing_root_stays_root() {
-    let s = PathBuf::from("/").to_string_lossy().trim_end_matches('/').to_string();
-    let result = if s.is_empty() { PathBuf::from("/") } else { PathBuf::from(s) };
+    let s = PathBuf::from("/")
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
+    let result = if s.is_empty() {
+        PathBuf::from("/")
+    } else {
+        PathBuf::from(s)
+    };
     assert_eq!(result, PathBuf::from("/"));
 }
 
 #[test]
 fn strip_trailing_no_slash() {
-    let s = PathBuf::from("/tmp/foo").to_string_lossy().trim_end_matches('/').to_string();
+    let s = PathBuf::from("/tmp/foo")
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
     assert_eq!(s, "/tmp/foo");
 }
 
@@ -38,7 +54,11 @@ fn strip_trailing_no_slash() {
 #[test]
 fn build_dest_path_file_to_file() {
     let dst = PathBuf::from("/tmp/dest.txt");
-    let result = if false { dst.join("file.txt") } else { dst.clone() };
+    let result = if false {
+        dst.join("file.txt")
+    } else {
+        dst.clone()
+    };
     assert_eq!(result, PathBuf::from("/tmp/dest.txt"));
 }
 
@@ -58,7 +78,9 @@ fn build_dest_path_parents_mode() {
 
 #[test]
 fn resolve_target_missing_operand() {
-    cp().assert().failure().stderr(predicates::str::contains("required"));
+    cp().assert()
+        .failure()
+        .stderr(predicates::str::contains("required"));
 }
 
 #[test]
@@ -71,7 +93,10 @@ fn resolve_target_two_files() {
     let e = Env::new();
     e.file("src.txt", "hello");
 
-    cp().arg(e.p("src.txt")).arg(e.p("dst.txt")).assert().success();
+    cp().arg(e.p("src.txt"))
+        .arg(e.p("dst.txt"))
+        .assert()
+        .success();
 
     assert_eq!(content(&e.p("dst.txt")), "hello");
 }
@@ -123,7 +148,7 @@ fn same_file_self() {
 fn metadata_follow_symlink() {
     let e = Env::new();
     e.file("real", "content");
-    e.symlink(&e.p("real"), "link");
+    e.symlink(e.p("real"), "link");
 
     assert!(std::fs::metadata(e.p("link")).unwrap().is_file());
     assert!(is_symlink(&e.p("link")));
@@ -170,7 +195,11 @@ fn build_dest_path_parents_strips_root() {
         .success();
 
     let expected = e.p("dest").join(src.strip_prefix("/").unwrap());
-    assert!(expected.exists(), "file should exist at: {}", expected.display());
+    assert!(
+        expected.exists(),
+        "file should exist at: {}",
+        expected.display()
+    );
     assert_eq!(std::fs::read_to_string(&expected).unwrap(), "content");
 }
 

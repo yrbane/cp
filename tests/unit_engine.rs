@@ -25,7 +25,11 @@ fn engine_copy_file_range_large_file() {
     let data: Vec<u8> = (0..10 * 1024 * 1024).map(|i| (i % 256) as u8).collect();
     e.file("src", &data);
 
-    cp().arg("--sparse=never").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--sparse=never")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(bytes(&e.p("dst")), data);
 }
@@ -75,7 +79,11 @@ fn engine_binary_data_integrity() {
     let data: Vec<u8> = (0..=255u8).cycle().take(100 * 1024).collect();
     e.file("binary", &data);
 
-    cp().arg("--sparse=never").arg(e.p("binary")).arg(e.p("dst")).assert().success();
+    cp().arg("--sparse=never")
+        .arg(e.p("binary"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(bytes(&e.p("dst")), data);
 }
@@ -103,7 +111,11 @@ fn engine_exact_chunk_boundary() {
     let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
     e.file("src", &data);
 
-    cp().arg("--sparse=never").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--sparse=never")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_size(&e.p("dst")), size as u64);
     assert_eq!(bytes(&e.p("dst")), data);
@@ -117,7 +129,11 @@ fn engine_just_over_chunk() {
     let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
     e.file("src", &data);
 
-    cp().arg("--sparse=never").arg(e.p("src")).arg(e.p("dst")).assert().success();
+    cp().arg("--sparse=never")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
 
     assert_eq!(file_size(&e.p("dst")), size as u64);
     assert_eq!(bytes(&e.p("dst")), data);

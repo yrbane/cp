@@ -27,7 +27,7 @@ pub fn copy_sparse(
     pb: &ProgressBar,
 ) -> CpResult<bool> {
     match mode {
-        SparseMode::Never => return Ok(false),
+        SparseMode::Never => Ok(false),
         SparseMode::Always => {
             // Always: detect zero blocks and create holes (maximizes sparseness)
             copy_sparse_by_zero_detection(src, dst, src_path, dst_path, size, pb)?;

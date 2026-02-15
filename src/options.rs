@@ -15,6 +15,7 @@ pub struct CopyOptions {
     pub hard_link: bool,
     pub symbolic_link: bool,
     pub attributes_only: bool,
+    #[allow(dead_code)]
     pub copy_contents: bool,
     pub remove_destination: bool,
     pub strip_trailing_slashes: bool,
@@ -22,6 +23,7 @@ pub struct CopyOptions {
     pub parents: bool,
     pub no_target_directory: bool,
     pub target_directory: Option<PathBuf>,
+    #[allow(dead_code)]
     pub keep_directory_symlink: bool,
 
     // Dereference behavior
@@ -34,7 +36,9 @@ pub struct CopyOptions {
     pub preserve_links: bool,
     pub preserve_xattr: bool,
     pub preserve_acl: bool,
+    #[allow(dead_code)]
     pub preserve_context: bool,
+    #[allow(dead_code)]
     pub preserve_all: bool,
 
     // Reflink
@@ -51,6 +55,7 @@ pub struct CopyOptions {
     pub backup_suffix: String,
 
     // SELinux
+    #[allow(dead_code)]
     pub selinux_context: Option<String>,
 }
 

@@ -7,7 +7,6 @@
 #![allow(dead_code)]
 
 pub use assert_cmd::Command;
-pub use predicates;
 
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -41,11 +40,10 @@ impl Env {
     /// Ensure parent directory exists (idempotent).
     #[inline]
     fn ensure_parent(p: &Path) {
-        if let Some(parent) = p.parent() {
-            if !parent.exists() {
+        if let Some(parent) = p.parent()
+            && !parent.exists() {
                 fs::create_dir_all(parent).unwrap();
             }
-        }
     }
 
     /// Public variant for use in test-local helpers (e.g. sparse file creation).
@@ -94,20 +92,13 @@ impl Env {
 
     /// Set mtime (seconds, 0 nanoseconds).
     pub fn set_mtime(&self, rel: &str, secs: i64) {
-        filetime::set_file_mtime(
-            self.p(rel),
-            filetime::FileTime::from_unix_time(secs, 0),
-        )
-        .unwrap();
+        filetime::set_file_mtime(self.p(rel), filetime::FileTime::from_unix_time(secs, 0)).unwrap();
     }
 
     /// Set mtime with nanosecond precision.
     pub fn set_mtime_ns(&self, rel: &str, secs: i64, nsec: u32) {
-        filetime::set_file_mtime(
-            self.p(rel),
-            filetime::FileTime::from_unix_time(secs, nsec),
-        )
-        .unwrap();
+        filetime::set_file_mtime(self.p(rel), filetime::FileTime::from_unix_time(secs, nsec))
+            .unwrap();
     }
 
     /// Set symlink's own mtime.

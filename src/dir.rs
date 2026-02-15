@@ -25,11 +25,7 @@ use crate::util;
 const CFR_MAX: usize = 1024 * 1024 * 1024;
 
 /// Copy a directory recursively.
-pub fn copy_directory(
-    src: &Path,
-    dst: &Path,
-    opts: &CopyOptions,
-) -> CpResult<()> {
+pub fn copy_directory(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()> {
     // Check for copy-into-self
     if dst.starts_with(src) && dst != src {
         return Err(CpError::CopyIntoSelf {
@@ -91,9 +87,7 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
             || opts.preserve_timestamps
             || opts.preserve_xattr
             || opts.preserve_acl,
-        need_dir_meta: opts.preserve_mode
-            || opts.preserve_ownership
-            || opts.preserve_timestamps,
+        need_dir_meta: opts.preserve_mode || opts.preserve_ownership || opts.preserve_timestamps,
         dir_meta: Vec::new(),
     };
 
@@ -101,7 +95,9 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
     if state.need_dir_meta {
         let mut stat: nix::libc::stat = unsafe { std::mem::zeroed() };
         if unsafe { nix::libc::fstat(src_fd, &mut stat) } == 0 {
-            state.dir_meta.push((src.to_path_buf(), dst.to_path_buf(), stat));
+            state
+                .dir_meta
+                .push((src.to_path_buf(), dst.to_path_buf(), stat));
         }
     }
 
@@ -114,13 +110,13 @@ fn copy_directory_raw(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResult<()
 
     // Apply deferred directory metadata in reverse order (deepest first)
     for (src_path, dst_path, stat) in state.dir_meta.iter().rev() {
-        apply_dir_metadata(&dst_path, stat, &state.opts)?;
+        apply_dir_metadata(dst_path, stat, state.opts)?;
         // xattr + ACL need path-based (only for directories, rare)
         if state.opts.preserve_xattr {
-            metadata::preserve_xattr_pub(&src_path, &dst_path).ok();
+            metadata::preserve_xattr_pub(src_path, dst_path).ok();
         }
         if state.opts.preserve_acl {
-            metadata::preserve_acl_pub(&src_path, &dst_path).ok();
+            metadata::preserve_acl_pub(src_path, dst_path).ok();
         }
     }
 
@@ -237,7 +233,9 @@ fn copy_dir_recurse(
                     if state.need_dir_meta {
                         let mut stat: nix::libc::stat = unsafe { std::mem::zeroed() };
                         if unsafe { nix::libc::fstat(child_src_fd, &mut stat) } == 0 {
-                            state.dir_meta.push((child_src.clone(), child_dst.clone(), stat));
+                            state
+                                .dir_meta
+                                .push((child_src.clone(), child_dst.clone(), stat));
                         }
                     }
 
@@ -259,9 +257,7 @@ fn copy_dir_recurse(
 
     // Phase 2: Copy regular files — parallel when enough entries
     if reg_files.len() >= PARALLEL_THRESHOLD {
-        copy_files_parallel(
-            &reg_files, src_fd, dst_fd, src_path, dst_path, state,
-        )?;
+        copy_files_parallel(&reg_files, src_fd, dst_fd, src_path, dst_path, state)?;
     } else {
         for name in &reg_files {
             copy_file_openat(src_fd, dst_fd, name.as_c_str(), src_path, dst_path, state)?;
@@ -281,7 +277,14 @@ fn copy_dir_recurse(
 
     // Phase 3: Copy symlinks (sequential — usually few)
     for name in &symlinks {
-        copy_symlink_at(src_fd, dst_fd, name.as_c_str(), src_path, dst_path, state.opts)?;
+        copy_symlink_at(
+            src_fd,
+            dst_fd,
+            name.as_c_str(),
+            src_path,
+            dst_path,
+            state.opts,
+        )?;
     }
 
     // Phase 4: Recurse into subdirectories
@@ -339,9 +342,9 @@ fn copy_file_openat(
     };
 
     // Hard link detection using the fstat we already did
-    if let Some(hlmap) = state.hard_link_map.as_mut() {
-        if let Some(ref s) = stat {
-            if s.st_nlink > 1 {
+    if let Some(hlmap) = state.hard_link_map.as_mut()
+        && let Some(ref s) = stat
+            && s.st_nlink > 1 {
                 let key = (s.st_dev, s.st_ino);
                 let name_os = bytes_to_os(name.to_bytes());
                 let dst_file_path = dst_dir_path.join(name_os);
@@ -360,8 +363,6 @@ fn copy_file_openat(
                 }
                 hlmap.insert(key, dst_file_path);
             }
-        }
-    }
 
     // Create destination: openat relative to dir fd
     let dst_fd = unsafe {
@@ -427,7 +428,7 @@ fn copy_files_parallel(
     let n_threads = std::thread::available_parallelism()
         .map(|n| n.get().min(8))
         .unwrap_or(4);
-    let chunk_size = (files.len() + n_threads - 1) / n_threads;
+    let chunk_size = files.len().div_ceil(n_threads);
 
     // Take hard_link_map out so the rest of state is immutable + Sync
     let hlmap = state.hard_link_map.take().map(Mutex::new);
@@ -448,9 +449,14 @@ fn copy_files_parallel(
                         return;
                     }
                     if let Err(e) = copy_file_openat_mt(
-                        src_fd, dst_fd, name.as_c_str(),
-                        src_path, dst_path,
-                        state_ref, hlmap_ref, deferred_ref,
+                        src_fd,
+                        dst_fd,
+                        name.as_c_str(),
+                        src_path,
+                        dst_path,
+                        state_ref,
+                        hlmap_ref,
+                        deferred_ref,
                     ) {
                         let mut g = err_ref.lock().unwrap();
                         if g.is_none() {
@@ -487,6 +493,7 @@ fn copy_files_parallel(
 /// Thread-safe file copy via openat. Like `copy_file_openat` but uses Mutex for hard link map.
 /// Hard links are deferred: the first occurrence of an inode is copied normally and registered
 /// in the map; subsequent occurrences push to `deferred_links` for creation after all copies finish.
+#[allow(clippy::too_many_arguments)]
 fn copy_file_openat_mt(
     src_dir_fd: RawFd,
     dst_dir_fd: RawFd,
@@ -526,12 +533,12 @@ fn copy_file_openat_mt(
     };
 
     // Hard link detection with Mutex — defer link creation to avoid race conditions
-    if let Some(hlm) = hlmap {
-        if let Some(ref s) = stat {
-            if s.st_nlink > 1 {
+    if let Some(hlm) = hlmap
+        && let Some(ref s) = stat
+            && s.st_nlink > 1 {
                 let key = (s.st_dev, s.st_ino);
                 let name_os = bytes_to_os(name.to_bytes());
-                let dst_file = dst_dir_path.join(&name_os);
+                let dst_file = dst_dir_path.join(name_os);
                 let mut guard = hlm.lock().unwrap();
                 if let Some(first) = guard.get(&key) {
                     // Another thread already claimed this inode — defer the hard link
@@ -545,8 +552,6 @@ fn copy_file_openat_mt(
                 guard.insert(key, dst_file);
                 drop(guard);
             }
-        }
-    }
 
     let dst_fd = unsafe {
         nix::libc::openat(
@@ -616,8 +621,8 @@ fn copy_and_close(
     }
 
     // Preserve metadata using fd-based syscalls
-    if state.need_file_meta {
-        if let Some(s) = stat {
+    if state.need_file_meta
+        && let Some(s) = stat {
             if state.opts.preserve_xattr {
                 preserve_xattr_fd(src_fd, dst_fd);
             }
@@ -649,7 +654,6 @@ fn copy_and_close(
                 preserve_acl_fd(src_fd, dst_fd);
             }
         }
-    }
 
     unsafe {
         nix::libc::close(src_fd);
@@ -735,11 +739,7 @@ fn copy_symlink_at(
 }
 
 /// Apply deferred directory metadata from raw stat.
-fn apply_dir_metadata(
-    dst: &Path,
-    stat: &nix::libc::stat,
-    opts: &CopyOptions,
-) -> CpResult<()> {
+fn apply_dir_metadata(dst: &Path, stat: &nix::libc::stat, opts: &CopyOptions) -> CpResult<()> {
     if opts.preserve_ownership && metadata::is_root() {
         let c_path = CString::new(dst.as_os_str().as_bytes()).ok();
         if let Some(c) = c_path {
@@ -767,12 +767,7 @@ fn apply_dir_metadata(
         if let Some(c) = c_path {
             let times = [atime, mtime];
             unsafe {
-                nix::libc::utimensat(
-                    nix::libc::AT_FDCWD,
-                    c.as_ptr(),
-                    times.as_ptr(),
-                    0,
-                );
+                nix::libc::utimensat(nix::libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0);
             }
         }
     }
@@ -830,18 +825,11 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
     };
 
     let need_dir_meta = opts.preserve_mode || opts.preserve_ownership || opts.preserve_timestamps;
-    let need_file_meta = opts.preserve_mode
-        || opts.preserve_ownership
-        || opts.preserve_timestamps
-        || opts.preserve_xattr
-        || opts.preserve_acl;
     let mut dir_metadata: Vec<(PathBuf, PathBuf, fs::Metadata)> = Vec::new();
 
     let mut pb: Option<ProgressBar> = None;
 
-    let walker = WalkDir::new(src)
-        .follow_links(follow_links)
-        .min_depth(0);
+    let walker = WalkDir::new(src).follow_links(follow_links).min_depth(0);
 
     let mut dest_path = PathBuf::with_capacity(dst.as_os_str().len() + 64);
     let mut last_parent: Option<PathBuf> = None;
@@ -868,13 +856,11 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
         let ft = entry.file_type();
 
         if ft.is_dir() {
-            if let Some(dev) = src_dev {
-                if let Ok(m) = fs::metadata(path) {
-                    if m.dev() != dev {
+            if let Some(dev) = src_dev
+                && let Ok(m) = fs::metadata(path)
+                    && m.dev() != dev {
                         continue;
                     }
-                }
-            }
 
             if !dest_path.exists() {
                 fs::create_dir_all(&dest_path).map_err(|e| CpError::CreateDir {
@@ -903,11 +889,10 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
             } else {
                 fs::symlink_metadata(path)
             };
-            if let Ok(meta) = meta {
-                if meta.dev() != dev {
+            if let Ok(meta) = meta
+                && meta.dev() != dev {
                     continue;
                 }
-            }
         }
 
         if let Some(parent) = dest_path.parent() {
@@ -927,27 +912,26 @@ fn copy_directory_walkdir(src: &Path, dst: &Path, opts: &CopyOptions) -> CpResul
         }
 
         // Handle hard links in slow path
-        if let Some(ref mut hlmap) = hard_link_map {
-            if !ft.is_symlink() {
-                if let Ok(meta) = fs::symlink_metadata(path) {
-                    if meta.nlink() > 1 {
+        if let Some(ref mut hlmap) = hard_link_map
+            && !ft.is_symlink()
+                && let Ok(meta) = fs::symlink_metadata(path)
+                    && meta.nlink() > 1 {
                         let key = (meta.dev(), meta.ino());
                         if let Some(first_dest) = hlmap.get(&key) {
                             if dest_path.exists() {
                                 let _ = fs::remove_file(&dest_path);
                             }
-                            fs::hard_link(first_dest, &dest_path).map_err(|e| CpError::HardLink {
-                                src: first_dest.clone(),
-                                dst: dest_path.clone(),
-                                source: e,
+                            fs::hard_link(first_dest, &dest_path).map_err(|e| {
+                                CpError::HardLink {
+                                    src: first_dest.clone(),
+                                    dst: dest_path.clone(),
+                                    source: e,
+                                }
                             })?;
                             continue;
                         }
                         hlmap.insert(key, dest_path.clone());
                     }
-                }
-            }
-        }
 
         let slow_pb = pb.get_or_insert_with(ProgressBar::hidden);
         copy::copy_single(path, &dest_path, opts, false, slow_pb)?;
