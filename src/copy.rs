@@ -47,6 +47,16 @@ pub fn copy_single(
     let dst_meta = fs::symlink_metadata(dst).ok();
     let dst_exists = dst_meta.is_some();
 
+    // Dangling symlink check: if dest is a symlink pointing nowhere,
+    // refuse to write through it unless --force or --remove-destination
+    if let Some(ref dm) = dst_meta {
+        if dm.file_type().is_symlink() && !dst.exists() && !opts.force && !opts.remove_destination {
+            return Err(CpError::DanglingSymlink {
+                path: dst.to_path_buf(),
+            });
+        }
+    }
+
     // Same file check
     if dst_exists && util::is_same_file(src, dst) {
         return Err(CpError::SameFile {

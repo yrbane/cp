@@ -382,3 +382,48 @@ fn copy_sparse_threshold_boundary() {
 
     assert_eq!(bytes(&e.p("sparse_src")), bytes(&e.p("dst")));
 }
+
+#[test]
+fn copy_overwrite_non_dir_with_dir_fails() {
+    let e = Env::new();
+    e.file("src/file.txt", "content");
+    e.file("dst", "i am a regular file");
+
+    // Copying dir onto a non-directory should fail
+    cp().arg("-R")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("cannot overwrite non-directory"));
+}
+
+#[test]
+fn copy_dangling_symlink_dest_fails() {
+    let e = Env::new();
+    e.file("src", "content");
+    e.symlink(e.p("nonexistent"), "dst");
+
+    // Without --force, copying through dangling symlink should fail
+    cp().arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("dangling symlink"));
+}
+
+#[test]
+fn copy_dangling_symlink_dest_force_succeeds() {
+    let e = Env::new();
+    e.file("src", "content");
+    e.symlink(e.p("nonexistent"), "dst");
+
+    // With --force or --remove-destination, it should succeed
+    cp().arg("-f")
+        .arg(e.p("src"))
+        .arg(e.p("dst"))
+        .assert()
+        .success();
+
+    assert_eq!(content(&e.p("dst")), "content");
+}

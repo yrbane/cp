@@ -59,12 +59,7 @@ pub enum CpError {
     NotADirectory { path: PathBuf },
 
     #[error("cannot overwrite non-directory '{dst}' with directory '{src}'")]
-    #[allow(dead_code)]
     OverwriteNonDir { src: PathBuf, dst: PathBuf },
-
-    #[error("will not overwrite just-created '{path}' with '{src}'")]
-    #[allow(dead_code)]
-    WillNotOverwrite { path: PathBuf, src: PathBuf },
 
     #[error("cannot copy '{src}' to '{dst}': {reason}")]
     Copy {
@@ -120,7 +115,6 @@ pub enum CpError {
     },
 
     #[error("not writing through dangling symlink '{path}'")]
-    #[allow(dead_code)]
     DanglingSymlink { path: PathBuf },
 
     #[error("cannot remove '{path}': {source}")]
@@ -134,10 +128,6 @@ pub enum CpError {
         path: PathBuf,
         source: std::io::Error,
     },
-
-    #[error("{0}")]
-    #[allow(dead_code)]
-    Other(String),
 }
 
 pub type CpResult<T> = Result<T, CpError>;

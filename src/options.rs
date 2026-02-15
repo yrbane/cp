@@ -15,16 +15,12 @@ pub struct CopyOptions {
     pub hard_link: bool,
     pub symbolic_link: bool,
     pub attributes_only: bool,
-    #[allow(dead_code)]
-    pub copy_contents: bool,
     pub remove_destination: bool,
     pub strip_trailing_slashes: bool,
     pub one_file_system: bool,
     pub parents: bool,
     pub no_target_directory: bool,
     pub target_directory: Option<PathBuf>,
-    #[allow(dead_code)]
-    pub keep_directory_symlink: bool,
 
     // Dereference behavior
     pub dereference: Dereference,
@@ -36,10 +32,6 @@ pub struct CopyOptions {
     pub preserve_links: bool,
     pub preserve_xattr: bool,
     pub preserve_acl: bool,
-    #[allow(dead_code)]
-    pub preserve_context: bool,
-    #[allow(dead_code)]
-    pub preserve_all: bool,
 
     // Reflink
     pub reflink: ReflinkMode,
@@ -53,10 +45,6 @@ pub struct CopyOptions {
     // Backup
     pub backup: BackupMode,
     pub backup_suffix: String,
-
-    // SELinux
-    #[allow(dead_code)]
-    pub selinux_context: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,8 +91,8 @@ impl CopyOptions {
         let mut preserve_links = archive || cli.no_deref_preserve_links;
         let mut preserve_xattr = archive;
         let mut preserve_acl = false;
-        let mut preserve_context = archive;
-        let mut preserve_all = archive;
+        let mut _preserve_context = archive;
+        let mut _preserve_all = archive;
 
         if let Some(ref attrs) = cli.preserve {
             for attr in attrs {
@@ -115,7 +103,7 @@ impl CopyOptions {
                     "links" => preserve_links = true,
                     "xattr" => preserve_xattr = true,
                     "acl" => preserve_acl = true,
-                    "context" => preserve_context = true,
+                    "context" => _preserve_context = true,
                     "all" => {
                         preserve_mode = true;
                         preserve_ownership = true;
@@ -123,8 +111,8 @@ impl CopyOptions {
                         preserve_links = true;
                         preserve_xattr = true;
                         preserve_acl = true;
-                        preserve_context = true;
-                        preserve_all = true;
+                        _preserve_context = true;
+                        _preserve_all = true;
                     }
                     _ => {}
                 }
@@ -140,7 +128,7 @@ impl CopyOptions {
                     "links" => preserve_links = false,
                     "xattr" => preserve_xattr = false,
                     "acl" => preserve_acl = false,
-                    "context" => preserve_context = false,
+                    "context" => _preserve_context = false,
                     "all" => {
                         preserve_mode = false;
                         preserve_ownership = false;
@@ -148,8 +136,8 @@ impl CopyOptions {
                         preserve_links = false;
                         preserve_xattr = false;
                         preserve_acl = false;
-                        preserve_context = false;
-                        preserve_all = false;
+                        _preserve_context = false;
+                        _preserve_all = false;
                     }
                     _ => {}
                 }
@@ -170,13 +158,6 @@ impl CopyOptions {
             .or_else(|| std::env::var("SIMPLE_BACKUP_SUFFIX").ok())
             .unwrap_or_else(|| "~".to_string());
 
-        // SELinux
-        let selinux_context = if cli.selinux_default {
-            Some(String::new())
-        } else {
-            cli.context.clone()
-        };
-
         Self {
             recursive: cli.recursive || archive,
             force: cli.force,
@@ -188,14 +169,12 @@ impl CopyOptions {
             hard_link: cli.hard_link,
             symbolic_link: cli.symbolic_link,
             attributes_only: cli.attributes_only,
-            copy_contents: cli.copy_contents,
             remove_destination: cli.remove_destination,
             strip_trailing_slashes: cli.strip_trailing_slashes,
             one_file_system: cli.one_file_system,
             parents: cli.parents,
             no_target_directory: cli.no_target_directory,
             target_directory: cli.target_directory.clone(),
-            keep_directory_symlink: cli.keep_directory_symlink,
             dereference,
             preserve_mode,
             preserve_ownership,
@@ -203,14 +182,11 @@ impl CopyOptions {
             preserve_links,
             preserve_xattr,
             preserve_acl,
-            preserve_context,
-            preserve_all,
             reflink,
             sparse,
             update: cli.update,
             backup,
             backup_suffix,
-            selinux_context,
         }
     }
 }

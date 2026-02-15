@@ -103,6 +103,14 @@ fn copy_source(
             });
         }
 
+        // Cannot overwrite non-directory with directory
+        if target.exists() && !target.is_dir() {
+            return Err(CpError::OverwriteNonDir {
+                src: source.to_path_buf(),
+                dst: target.clone(),
+            });
+        }
+
         dir::copy_directory(source, &target, opts)?;
 
         if opts.verbose {
